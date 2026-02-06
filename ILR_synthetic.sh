@@ -1,8 +1,20 @@
 #!/bin/bash
 
-# Activate conda environment
-source /users/antonios/miniconda3/etc/profile.d/conda.sh
-conda activate r-metabo
+RSCRIPT=/users/antonios/miniconda3/envs/r-metabo/bin/Rscript
 
-# Run the Bayesian inference R script
-Rscript /users/antonios/LEAF_revisit/synthetic_microbiome/Bayesian-inference-of-bacteria-metabolite-interactions/ILR_SYNTHETIC/ILR.R
+# Run from the synthetic directory
+cd "$(dirname "$0")/R/synthetic"
+
+# Step 1: Generate synthetic community data
+echo "=== Step 1: Generating synthetic community ==="
+$RSCRIPT complex_synthetic_community.R
+
+# Step 2: CLR transformation
+echo "=== Step 2: CLR transformation ==="
+$RSCRIPT CLR.R
+
+# Step 3: ILR transformation
+echo "=== Step 3: ILR transformation ==="
+$RSCRIPT ILR.R
+
+echo "=== Pipeline complete ==="

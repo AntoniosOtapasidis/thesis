@@ -656,13 +656,13 @@ def main():
     
     elif args.dataset == "microbiome_synthetic":
         df_X1 = pd.read_csv(
-            "/users/antonios/LEAF_revisit/synthetic_microbiome/Bayesian-inference-of-bacteria-metabolite-interactions/complex_model/CLR_clean/seeds/X1_bacteria_synthetic_CLR.csv"
+            "R/synthetic/X1_bacteria_synthetic_CLR.csv"
         )
         df_X2 = pd.read_csv(
-            "/users/antonios/LEAF_revisit/synthetic_microbiome/Bayesian-inference-of-bacteria-metabolite-interactions/complex_model/CLR_clean/seeds/X1_bacteria_synthetic_CLR.csv"
+            "R/synthetic/X2_viruses_synthetic_CLR.csv"
         )
         df_Y = pd.read_csv(
-            "/users/antonios/LEAF_revisit/synthetic_microbiome/Bayesian-inference-of-bacteria-metabolite-interactions/complex_model/CLR_clean/Y_metabolites_log_synthetic_complex_RA.csv"
+            "R/synthetic/Y_metabolites_log_synthetic_complex_RA_COPSAC.csv"
         )
 
 
@@ -701,7 +701,7 @@ def main():
 
         # 3) load GT variance shares from R
         df_gt = pd.read_csv(
-            "/users/antonios/LEAF_revisit/synthetic_microbiome/Bayesian-inference-of-bacteria-metabolite-interactions/complex_model/CLR_clean/GT_virome_variance_shares_complex.csv"
+            "R/synthetic/GT_virome_variance_shares_complex_COPSAC.csv"
         )
 
         # ensure metabolite ordering in GT matches Y columns
@@ -778,13 +778,13 @@ def main():
 
     elif args.dataset == "microbiome_synthetic_ilr":
         df_X1 = pd.read_csv(
-            "/users/antonios/LEAF_revisit/synthetic_microbiome/Bayesian-inference-of-bacteria-metabolite-interactions/complex_model/ilr_clean/X1_bacteria_synthetic_ILR_final.csv"
+            "R/synthetic/X1_bacteria_synthetic_ILR_final.csv"
         )
         df_X2 = pd.read_csv(
-            "/users/antonios/LEAF_revisit/synthetic_microbiome/Bayesian-inference-of-bacteria-metabolite-interactions/complex_model/ilr_clean/X2_viruses_synthetic_ILR_final.csv"
+            "R/synthetic/X2_viruses_synthetic_ILR_final.csv"
         )
         df_Y = pd.read_csv(
-            "/users/antonios/LEAF_revisit/synthetic_microbiome/Bayesian-inference-of-bacteria-metabolite-interactions/complex_model/CLR_clean/Y_metabolites_log_synthetic_complex_RA.csv"
+            "R/synthetic/Y_metabolites_log_synthetic_complex_RA_COPSAC.csv"
         )
 
 
@@ -820,7 +820,7 @@ def main():
 
         # 3) load GT variance shares from R
         df_gt = pd.read_csv(
-            "/users/antonios/LEAF_revisit/synthetic_microbiome/Bayesian-inference-of-bacteria-metabolite-interactions/complex_model/CLR_clean/GT_virome_variance_shares_complex.csv"
+            "R/synthetic/GT_virome_variance_shares_complex_COPSAC.csv"
         )
 
         # ensure metabolite ordering in GT matches Y columns
