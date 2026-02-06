@@ -1,0 +1,970 @@
+---
+title: "Metabolite ANOVA"
+format: html
+---
+
+```{r}
+library(limpca)
+library(dplyr)
+library(forcats)
+
+metabolite_data <- read.delim("~/data/metabolites.known.tsv",
+                              header = TRUE, check.names = FALSE)
+meta <- read.delim("transportation.tsv",
+                   header = TRUE, check.names = FALSE)
+metabolite_data
+```
+
+```{r}
+machine_metadata <- read.delim("~/data/machine_metadata.tsv",
+                              header = TRUE, check.names = FALSE)
+machine_metadata
+```
+
+I am going to keep the month of extraction of the samples and machine
+
+```{r}
+library(dplyr)
+library(lubridate)
+
+
+machine_metadata <- machine_metadata %>%
+  mutate(
+    sampledate = as.Date(trimws(as.character(sampledate)), format = "%d-%m-%Y"),
+
+    season = factor(
+      case_when(
+        month(sampledate) %in% c(12, 1, 2)  ~ "Winter",
+        month(sampledate) %in% c(3, 4, 5)   ~ "Spring",
+        month(sampledate) %in% c(6, 7, 8)   ~ "Summer",
+        month(sampledate) %in% c(9,10,11)  ~ "Autumn",
+        TRUE                                ~ NA_character_
+      ),
+      levels = c("Winter", "Spring", "Summer", "Autumn")
+    )
+  )
+```
+
+```{r}
+machine_metadata <- dplyr::rename(machine_metadata, id = `0`)
+```
+
+```{r}
+colnames(machine_metadata)
+
+machine_metadata_season <- machine_metadata %>% dplyr::select(id, season)
+
+```
+
+```{r}
+sample_metadata <- read.table("samples.metadata.tsv", sep = "\t",header= TRUE)
+sample_metadata <- dplyr::rename(sample_metadata,id = index)
+sample_metadata
+```
+
+Feature engineering lets go
+
+```{r}
+sample_metadata <- sample_metadata %>%
+  mutate(
+    # Convert to numeric → divide by 365 → round → store as integer
+    sge18 = as.integer(round(as.numeric(age_at18yfecalsampling) / 365))
+  )
+#sample_metadata
+```
+
+Feature engineering on the BMI
+
+```{r}
+
+sample_metadata$bmi18y <- round(sample_metadata$bmi18y, 1)
+
+sample_metadata <- sample_metadata %>%
+  mutate(
+    bmi_class = case_when(
+      is.na(bmi18y)                           ~ "Unknown",
+      bmi18y < 18.5                           ~ "Underweight",
+      bmi18y >= 18.5 & bmi18y <= 24.9            ~ "Healthy weight",
+      bmi18y >= 25.0 & bmi18y <= 29.9            ~ "Overweight",
+      bmi18y >= 30.0 & bmi18y <= 34.9            ~ "Obese Class 1",
+      bmi18y >= 35.0 & bmi18y <= 39.9            ~ "Obese Class 2",
+      bmi18y >= 40.0                          ~ "Obese Class 3",
+      TRUE                                 ~ NA_character_
+    ),
+
+    bmi_class = factor(bmi_class,
+                       levels = c("Underweight",
+                                  "Healthy weight",
+                                  "Overweight",
+                                  "Obese Class 1",
+                                  "Obese Class 2",
+                                  "Obese Class 3",
+                                  "Unknown")))
+```
+
+```{r}
+library(dplyr)
+library(tibble)   # for column_to_rownames()
+sample_metadata <- sample_metadata %>% 
+  #  drop unwanted columns
+  dplyr::select(-age_at18yfecalsampling, -bmi18y) %>% 
+  #  rename the column
+  rename(heavy_drinking = heavy) %>% 
+  #  make `index` the rownames (turns tibble into data.frame)
+  column_to_rownames(var = "id")
+
+sample_metadata
+```
+
+```{r}
+sample_metadata <- sample_metadata[, colnames(sample_metadata) != "Socialcircumstances"]
+colnames(sample_metadata)
+```
+
+```{r}
+meta <- as.data.frame(meta)
+stopifnot("id" %in% names(meta))
+
+rownames(meta) <- make.unique(as.character(meta$id))
+meta$id <- NULL
+```
+
+Feature engineering on the transportDays
+
+```{r}
+
+#qs <- quantile(meta$transportDays, probs = seq(0, 1, length.out = 6), na.rm = TRUE)
+#qs <- unique(qs)  # in case of ties at quantile boundaries
+
+#meta$transportDays_q5 <- cut(
+##  meta$transportDays,
+#  breaks = qs,
+#  include.lowest = TRUE,
+#  labels = paste0("Q", seq_len(length(qs) - 1))
+#)
+#meta <- subset(meta, select = -transportDays)
+#str(meta)
+```
+
+```{r}
+machine_metadata_season <- as.data.frame(machine_metadata_season)
+stopifnot("id" %in% names(machine_metadata_season))
+
+rownames(machine_metadata_season) <- make.unique(as.character(machine_metadata_season$id))
+machine_metadata_season$id <- NULL
+```
+
+```{r}
+metabolite_data <- as.data.frame(metabolite_data)
+stopifnot("id" %in% names(metabolite_data))
+
+rownames(metabolite_data) <- make.unique(as.character(metabolite_data$id))
+metabolite_data$id <- NULL
+```
+
+Align the datasets
+
+```{r}
+
+library(dplyr)
+
+##  Keep the first row for each duplicated key
+metabolite_data <- metabolite_data[!duplicated(rownames(metabolite_data)), , drop = FALSE]
+meta            <- meta[!duplicated(rownames(meta)), , drop = FALSE]
+machine         <- machine_metadata_season[!duplicated(rownames(machine_metadata_season)), , drop = FALSE]
+
+
+common_ids <- Reduce(intersect,
+                     list(rownames(metabolite_data),
+                          rownames(meta), #rownames(bacteriome_richness),rownames(virome_richness),
+                          rownames(machine)))
+
+metabolite_data <- metabolite_data[common_ids, , drop = FALSE]
+meta            <- meta[common_ids, , drop = FALSE]
+machine         <- machine[common_ids, , drop = FALSE]
+#bacteriome_richness         <- bacteriome_richness[common_ids, , drop = FALSE]
+#virome_richness         <- virome_richness[common_ids, , drop = FALSE]
+
+stopifnot(identical(rownames(metabolite_data), rownames(meta)))
+stopifnot(identical(rownames(metabolite_data), rownames(machine)))
+#stopifnot(identical(rownames(metabolite_data), rownames(bacteriome_richness)))
+#stopifnot(identical(rownames(metabolite_data), rownames(virome_richness)))
+#stopifnot("transportDays_q5" %in% colnames(meta))
+```
+
+```{r}
+library(dplyr)
+library(tibble)
+
+sample_metadata <- sample_metadata %>% rownames_to_column("id")
+meta            <- meta %>% rownames_to_column("id")
+machine <- machine %>% rownames_to_column("id")
+#bacteria <- bacteriome_richness %>% rownames_to_column("id")
+#viruses <- virome_richness %>% rownames_to_column("id")
+
+joined <- Reduce(
+  function(x, y) inner_join(x, y, by = "id"),
+  list(sample_metadata, meta, machine)) %>%
+  #, bacteria, viruses)
+  arrange(id) %>%
+  distinct(id, .keep_all = TRUE) %>%   # <-- make sure ids are unique
+  tibble::column_to_rownames(var = "id")
+joined
+
+
+```
+
+```{r}
+joined <- joined %>% mutate(urbanrural_18y = tidyr::replace_na(urbanrural_18y, "Unknown"))
+joined <- joined %>% mutate(urbanrural_18y = tidyr::replace_na(urbanrural_18y, "Unknown"))
+
+```
+
+Make the metadata factors for my formula
+
+```{r}
+colnames(joined)
+metadata_processed <- joined
+```
+
+```{r}
+
+metadata_processed$transportDays <- factor(
+  as.integer(metadata_processed$transportDays),
+  ordered = FALSE  # Treat as categorical for ASCA
+)
+
+metadata_processed$sge18 <- factor(
+  as.integer(metadata_processed$sge18),
+  ordered = FALSE  # Treat as categorical for ASCA
+)
+
+# Verify contrasts
+options(contrasts = c("contr.sum", "contr.poly"))
+contrasts(metadata_processed$transportDays)  # Should show sum-to-zero contrasts
+contrasts(metadata_processed$sge18)          # Should show sum-to-zero contrasts
+
+
+metadata_processed$Sex    <- factor(metadata_processed$Sex,    levels = c("Female", "Male"))
+
+metadata_processed <- metadata_processed %>%
+  mutate(urbanrural_18y = factor(
+           tidyr::replace_na(urbanrural_18y, "Unknown"),
+           levels = c("Rural", "Urban", "Unknown")
+         ))
+
+metadata_processed$FURANIMAL <- factor(metadata_processed$FURANIMAL, levels = c(0, 1))
+
+
+metadata_processed$All_forms_of_pain <- factor(metadata_processed$All_forms_of_pain, levels = c(0,1))
+
+metadata_processed$heavy_drinking <- factor(metadata_processed$heavy_drinking, levels = c(0, 1))
+
+#metadata_processed$containertype <- factor(metadata_processed$containertype)
+
+
+#metadata_processed$Shannon_V <- round(metadata_processed$Shannon_V, 2)
+#metadata_processed$Shannon_B <- round(metadata_processed$Shannon_B, 2)
+metadata_processed
+
+```
+
+```{r}
+
+write.table(metadata_processed, "metadata_processed.tsv", sep = "\t")
+
+```
+
+All effects are described as their deviation from the mean
+
+```{r}
+metadata_processed <- read.table("metadata_processed.tsv", sep = "\t", header = TRUE)
+###############################
+# 2) Make sure the matrix is numeric
+###############################
+# Coerce all columns to numeric (error if non-numeric remains)
+X <- as.matrix(data.frame(lapply(metabolite_data, function(col) {
+  if (is.numeric(col)) return(col)
+  suppressWarnings(as.numeric(col))
+}), check.names = FALSE, row.names = rownames(metabolite_data)))
+
+if (anyNA(X) && all(is.na(X))) {
+  stop("All values became NA after numeric coercion. Check your input file.")
+}
+```
+
+Add the zero constraint
+
+`limpca` applies a GLM (General Linear Model) version of ASCA and APCA to analyse multivariate sample profiles generated by an experimental design. ASCA/APCA provide powerful visualization tools for multivariate structures in the space of each effect of the statistical model linked to the experimental design and contrarily to MANOVA, it can deal with mutlivariate datasets having more variables than observations. `limpca` presents different advantages compared to other software in this field:
+
+### (1) it is able to treat any balanced or unbalanced experimental design for fixed categorical factors, 
+
+```{r}
+if (!requireNamespace("BiocManager", quietly = TRUE))
+    install.packages("BiocManager")
+    
+BiocManager::install("limpca")
+```
+
+```{r}
+library("limpca")
+str(meta)
+```
+
+```{r}
+meta <- as.data.frame(meta)
+rownames(meta) <- make.unique(as.character(meta$id))
+meta$id <- NULL
+```
+
+ASCA+ for unbalanced dataset
+
+```{r}
+colnames(metadata_processed)
+outcomes <- as.matrix(metabolite_data)
+
+predictors <- c( "Sex", "urbanrural_18y", "FURANIMAL", "All_forms_of_pain", "heavy_drinking", "sge18", "bmi_class", "season", "transportDays")
+
+
+
+#predictors <- c("transportDays","season","boxbarcode")
+
+#k <- 3
+#model_formula <- sprintf("~ (%s)^%d", paste(predictors, collapse = " + "), k)
+
+design <- metadata_processed[, predictors, drop = FALSE]
+
+```
+
+```{r}
+factors_subset <- c( "Sex", "urbanrural_18y", "FURANIMAL", "All_forms_of_pain", "heavy_drinking", "sge18", "bmi_class", "season", "transportDays")
+
+lvl_counts <- sapply(metadata_processed[factors_subset], function(x) length(unique(x)))
+lvl_counts
+```
+
+```{r}
+lvl_counts <- sapply(metadata_processed[factors_subset], function(x) length(unique(x)))
+lvl_counts
+```
+
+```{r}
+factorial_size <- prod(lvl_counts)
+factorial_size 
+```
+
+```{r}
+## 1a. Keep only existing names
+factors2 <- intersect(factors_subset, names(metadata_processed))
+
+## 1b. Inspect the length of each column
+lens <- sapply(metadata_processed[factors_subset], length)
+lens
+```
+
+Test for nested variables
+
+```{r}
+factors <- c("Sex", "urbanrural_18y", "FURANIMAL", "All_forms_of_pain", "heavy_drinking", "sge18", "bmi_class", "season", "transportDays")
+
+is_nested <- function(A, B) {
+  A <- droplevels(factor(A))
+  B <- droplevels(factor(B))
+  ok <- complete.cases(A, B)
+  A <- A[ok]; B <- B[ok]
+  tbl <- table(A, B)
+  all(rowSums(tbl > 0) == 1)
+}
+
+found <- FALSE
+for (A in factors) {
+  for (B in factors) {
+    if (A != B && is_nested(design[[A]], design[[B]])) {
+      cat(A, "is nested in", B, "\n")
+      found <- TRUE
+    }
+  }
+}
+if (!found) cat("No nesting detected\n")
+
+
+```
+
+for ANOVA, **multiple observations per treatment/cell are required** to estimate the **experimental error variance** (residual). With a single observation, you can’t estimate within-group variation.
+
+```{r}
+
+
+cat("\n=== transportDays distribution ===\n")
+print(sort(table(metadata_processed$transportDays)))
+
+cat("\n=== sge18 distribution ===\n")
+print(sort(table(metadata_processed$sge18)))
+
+cat("\n=== bmi_class distribution ===\n")
+print(sort(table(metadata_processed$bmi_class)))
+```
+
+```{r}
+library(dplyr)
+library(forcats)
+
+
+metadata_clean <- metadata_processed %>%
+  mutate(
+    # Create upper cap: merge all days ≥10 into "10+"
+    transportDays = case_when(
+      as.numeric(as.character(transportDays)) >= 7 ~ "7+",
+      TRUE ~ as.character(transportDays)
+    ),
+    transportDays = factor(transportDays, 
+                          levels = c("0", "1", "2", "3", "4", "5", "6", "7+")),
+    # sge18: Cap at 20+ (merge 20, 21 and any higher ages)
+    
+    
+    # sge18: Cap at 20+
+    sge18 = case_when(
+      as.numeric(as.character(sge18)) >= 20 ~ "20+",
+      TRUE ~ as.character(sge18)
+    ),
+    sge18 = factor(sge18),
+    
+    # bmi_simple: Treat Unknown and Obese Class 3 as "Unknown"
+    bmi_simple = case_when(
+      is.na(bmi_class) ~ "Unknown",                          # NA → Unknown
+      bmi_class == "Unknown" ~ "Unknown",                     # Keep Unknown
+      bmi_class == "Obese Class 3" ~ "Unknown",              # Singleton → Unknown
+      bmi_class %in% c("Obese Class 1", "Obese Class 2") ~ "Obese",  # Merge Obese
+      TRUE ~ as.character(bmi_class)
+    ),
+    bmi_simple = factor(bmi_simple),
+    
+    # Make sure other factors also treat NA as Unknown
+    urbanrural_18y = factor(tidyr::replace_na(as.character(urbanrural_18y), "Unknown")),
+    
+    # Other factors: convert NA to a valid level if needed
+    Sex = factor(tidyr::replace_na(as.character(Sex), "Unknown")),
+    FURANIMAL = factor(tidyr::replace_na(as.character(FURANIMAL), "Unknown")),
+    All_forms_of_pain = factor(tidyr::replace_na(as.character(All_forms_of_pain), "Unknown")),
+    heavy_drinking = factor(tidyr::replace_na(as.character(heavy_drinking), "Unknown")),
+    season = factor(tidyr::replace_na(as.character(season), "Unknown"))
+  )
+```
+
+```{r}
+cat("\n=== transportDays distribution ===\n")
+print(sort(table(metadata_clean$transportDays)))
+
+cat("\n=== sge18 distribution ===\n")
+print(sort(table(metadata_clean$sge18)))
+
+cat("\n=== bmi_simple distribution ===\n")
+print(sort(table(metadata_clean$bmi_simple)))
+```
+
+```{r}
+colnames(metadata_clean)
+```
+
+```{r}
+model_cols <- c(
+  "Sex", "urbanrural_18y", "FURANIMAL", "All_forms_of_pain",
+  "heavy_drinking", "sge18", "bmi_simple", "season", "transportDays"
+)
+
+design <- metadata_clean[, model_cols, drop = FALSE]
+
+
+
+
+# Verify no NAs remain
+if (any(is.na(design))) {
+  cat(" Still have NAs in design matrix!\n")
+  cat("Columns with NAs:\n")
+  print(colSums(is.na(design)))
+} else {
+  cat("No NAs in design matrix - all converted to 'Unknown'\n")
+}
+
+cat("Design dimensions:", dim(design), "\n")
+cat("Expected: 177 rows (all samples kept)\n")
+
+
+```
+
+```{r}
+#model_formula <- "outcomes ~ Sex + urbanrural_18y + FURANIMAL + All_forms_of_pain + heavy_drinking +  sge18 + bmi_class +  season + boxbarcode +transportDays + containertype"
+
+
+
+#model_formula <- "outcomes ~ Sex * urbanrural_18y * FURANIMAL * All_forms_of_pain * heavy_drinking *  sge18 * bmi_class *  season * boxbarcode *transportDays * containertype"
+
+
+model_formula <- "outcomes ~ Sex + urbanrural_18y + FURANIMAL + All_forms_of_pain + heavy_drinking + sge18 + bmi_simple + season + transportDays"
+
+model_cols <- colnames(design)
+
+model_formula <- paste(
+  "outcomes ~",
+  paste(model_cols, collapse = " + ")
+)
+
+model_formula
+
+# Safety check against *design*
+missing_cols <- setdiff(model_cols, colnames(design))
+if (length(missing_cols) > 0) {
+  stop("These model_cols are missing from design: ", paste(missing_cols, collapse = ", "))
+}
+
+
+```
+
+```{r}
+colnames(design)
+
+```
+
+```{r}
+
+lmpData <- data2LmpDataList(
+  outcomes = as.matrix(outcomes),
+  design   = design,
+  formula  = model_formula
+)
+
+
+cat("\n=== lmpData Check ===\n")
+cat("lmpData$outcomes dimensions:", dim(lmpData$outcomes), "\n")
+cat("NAs in lmpData$outcomes:", sum(is.na(lmpData$outcomes)), "\n")
+
+```
+
+```{r}
+
+
+cat("\n=== BEFORE filtering ===\n")
+cat("metabolite_data NAs:", sum(is.na(metabolite_data)), "\n")
+cat("metabolite_data dimensions:", dim(metabolite_data), "\n")
+
+cat("\n=== AFTER filtering metadata ===\n")
+cat("metadata_clean rows:", nrow(metadata_clean), "\n")
+cat("Rows removed:", nrow(metadata_processed) - nrow(metadata_clean), "\n")
+
+cat("\n=== AFTER alignment ===\n")
+cat("outcomes NAs:", sum(is.na(outcomes)), "\n")
+cat("outcomes dimensions:", dim(outcomes), "\n")
+
+# Check if specific metabolites have issues
+cat("\n=== Metabolites with issues ===\n")
+problematic <- colnames(outcomes)[colSums(is.na(outcomes)) > 0 | 
+                                   colSums(is.infinite(as.matrix(outcomes))) > 0]
+if (length(problematic) > 0) {
+  print(problematic)
+} else {
+  cat("No problematic metabolites found\n")
+}
+
+# Check if the issue is in log transformation
+cat("\n=== Check for zeros or negatives (before log) ===\n")
+cat("Zero values:", sum(outcomes == 0, na.rm = TRUE), "\n")
+cat("Negative values:", sum(outcomes < 0, na.rm = TRUE), "\n")
+```
+
+The design matrix needs to contain values in all of the places
+
+```{r}
+limpca::plotDesign(
+    design = lmpData$design, x = "season",
+    y = "Sex",cols = 'FURANIMAL',
+    title = "Initial Design of the metabolite dataset"
+)
+```
+
+### **Data visualisation**
+
+```{r}
+resPCA <- limpca::pcaBySvd(lmpData$outcomes)
+limpca::pcaScreePlot(resPCA, nPC = 10)
+```
+
+This scree plot shows that the data should be log transformed
+
+```{r}
+limpca::pcaScorePlot(
+    resPcaBySvd = resPCA, axes = c(1, 2),
+    title = "Score plot of original data ",
+    design = lmpData$design, color = "Sex",
+    points_labs_rn = TRUE
+)
+```
+
+Log transformation of the data
+
+```{r}
+lmpData_log <- lmpData
+lmpData_log$outcomes <- as.matrix(log10(lmpData$outcomes))
+
+# new PCA
+resPCA1 <- limpca::pcaBySvd(lmpData_log$outcomes)
+limpca::pcaScreePlot(resPCA1, nPC = 9)
+
+```
+
+```{r}
+# 1) Confirm the objects exist
+exists("lmpData")
+exists("lmpData_log")
+
+# 2) Confirm lmpData has the expected slots
+names(lmpData)
+names(lmpData_log)
+
+# 3) Confirm outcomes is numeric matrix and dimensions look right
+class(lmpData$outcomes)
+is.matrix(lmpData$outcomes)
+mode(lmpData$outcomes)
+dim(lmpData$outcomes)
+
+class(lmpData_log$outcomes)
+is.matrix(lmpData_log$outcomes)
+mode(lmpData_log$outcomes)
+dim(lmpData_log$outcomes)
+
+# 4) Confirm your log transform actually happened
+identical(lmpData$outcomes, lmpData_log$outcomes)   # should be FALSE
+
+# 5) Confirm there are no Inf/-Inf/NaN introduced
+sum(!is.finite(lmpData_log$outcomes))
+range(lmpData_log$outcomes, finite = TRUE)
+
+# 6) Confirm you're calling the right PCA functions and result has expected fields
+resPCA1 <- limpca::pcaBySvd(lmpData_log$outcomes)
+class(resPCA1)
+names(resPCA1)
+
+```
+
+```{r}
+limpca::pcaScorePlot(
+    resPcaBySvd = resPCA1, axes = c(1, 2),
+    title = "Score plot of Log10 data ",
+    design = lmpData_log$design, color = "Sex", points_labs_rn = TRUE
+)
+```
+
+I don t see the present of confounding for Sex, urban_rural, heavy drinking nor BMI class, no season
+
+```{r}
+limpca::pcaScorePlot(
+    resPcaBySvd = resPCA1, axes = c(1, 2),
+    title = "Score plot of Log10 data ",
+    design = lmpData_log$design, color = "season", points_labs_rn = TRUE
+)
+```
+
+No Outliers no Batch effects
+
+------------------------------------------------------------------------
+
+centering and scaling of the outcomes
+
+```{r}
+mean_outcomes <- scale(lmpData_log$outcomes, center = TRUE, scale = TRUE)
+mean_outcomes
+```
+
+```{r}
+final_lmpData <- list(
+    outcomes = mean_outcomes,  # 
+    design = lmpData_log$design,
+    formula = lmpData_log$formula
+)
+```
+
+have passed log metabolite abundances int he LimPCA
+
+```{r}
+library(car)
+library(pander)
+library(gridExtra)
+library(ggplot2)
+library(limpca)
+pander(head(final_lmpData$design))
+
+```
+
+```{r}
+# Loadings Plot for the hippurate
+limpca::plotDesign(
+    design = final_lmpData$design,
+    title = "Design of processed metabolite dataset"
+)
+```
+
+```{r}
+limpca::plotLine(final_lmpData$outcomes,
+    rows = c(1, 50),
+    xaxis_type = "character", type = "s"
+) +
+    ggplot2::theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+```{r}
+resPCA_mean <- limpca::pcaBySvd(final_lmpData$outcomes)
+
+# Scree
+pcaScreePlot(resPCA_mean, nPC = 10)
+
+# PC scores
+scores <- as.data.frame(resPCA_mean$score)   # sometimes named $scores in other PCA objs
+# If that errors, try: scores <- as.data.frame(resPCA_mean$scores)
+
+# Add ALL factors
+scores <- cbind(scores, final_lmpData$design)
+
+# Check you actually appended everything
+colnames(scores)
+
+```
+
+```{r}
+#remove.packages("stringr")
+#install.packages("stringr")
+
+
+
+```
+
+```{r}
+
+
+resLmpModelMatrix <- limpca::lmpModelMatrix(final_lmpData)
+pander::pander(head(resLmpModelMatrix$modelMatrix))
+
+resLmpEffectMatrices <- lmpEffectMatrices(resLmpModelMatrix)
+resLmpEffectMatrices$varPercentagesPlot
+
+```
+
+```{r}
+library(pander)
+
+pander(resLmpEffectMatrices$variationPercentages)
+
+```
+
+```{r}
+resLmpEffectMatrices$varPercentagesPlot 
+
+```
+
+```{r}
+resLmpBootstrapTests <- lmpBootstrapTests(
+    resLmpEffectMatrices = resLmpEffectMatrices,
+    nboot = 1000
+)
+
+# Print p-values
+pander::pander(t(resLmpBootstrapTests$resultsTable))
+```
+
+```{r}
+tab <- t(resLmpBootstrapTests$resultsTable)
+
+write.csv(tab, file = "bootstrap_results_table.csv", row.names = TRUE)
+
+```
+
+```{r}
+resASCA <- lmpPcaEffects(
+    resLmpEffectMatrices = resLmpEffectMatrices,
+    method = "ASCA-E"
+
+)
+
+resLmpContributions <- lmpContributions(resASCA)
+pander::pander(resLmpContributions$totalContribTable)
+
+```
+
+```{r}
+"(Intercept)" %in% colnames(resLmpModelMatrix$modelMatrix)
+resLmpEffectMatrices$variationPercentages
+
+```
+
+```{r}
+sum(resLmpEffectMatrices$variationPercentages)
+
+```
+
+The remaining 3,5% of unexplained variance is attributed ot the intercept which is included in the model by limpca
+
+```{r}
+pander::pander(resLmpContributions$effectTable)
+
+```
+
+```{r}
+resLmpContributions$plotContrib 
+
+```
+
+```{r}
+resLmpEffectMatrices$variationPercentages
+vp <- resLmpEffectMatrices$variationPercentages
+
+dim(final_lmpData$design)
+dim(resLmpModelMatrix$modelMatrix)
+colnames(resLmpModelMatrix$modelMatrix)
+
+```
+
+```{r}
+library(limpca)
+library(ggplot2)
+library(dplyr)
+library(forcats)
+library(pander)
+library(car)
+library(limpca)
+library(ggplot2)
+library(dplyr)
+library(forcats)
+library(pander)
+library(car)
+library(ggplot2)
+library(dplyr)
+library(stringr)
+
+library(ggplot2)
+library(dplyr)
+library(stringr)
+
+rename_map <- c(
+  "transportDays\nPC1"      = "Transport Days PC1",
+  "urbanrural_y\n PC1"       = "Urban or Rural PC1",
+  "bmi_simple\nPC1"         = "BMI PC1",
+  "season\nPC1"             = "Season PC1",
+  "sge\nPC1"                = "Age PC1",
+  "FURANIMAL\nPC1"          = "Animal Possession PC1",
+  "heavy_drinking\nPC1"     = "Alcohol Consumption PC1",
+  "Sex\nPC1"                = "Gender PC1",
+  "All_forms_of_pain\nPC1"  = "Pain PC1"
+)
+
+plot_to_save <- resLmpContributions$plotContrib +
+  scale_y_discrete(labels = function(y) {
+    y2 <- ifelse(y %in% names(rename_map), rename_map[y], y)
+    stringr::str_wrap(y2, width = 18)
+  })
+
+plot_to_save
+
+
+plot_to_save <- resLmpContributions$plotContrib +
+  scale_x_discrete(labels = function(x) {
+    x2 <- ifelse(x %in% names(rename_map), rename_map[x], x)
+    stringr::str_wrap(x2, width = 18)
+  }) +
+  theme_minimal(base_size = 12) +
+  theme(
+    axis.text.x = element_text(angle = 35, hjust = 1, vjust = 1, size = 10),
+    axis.text.y = element_text(size = 10),
+    axis.title = element_text(size = 12),
+    plot.title = element_text(size = 14, hjust = 0),
+    plot.subtitle = element_text(size = 12, hjust = 0),
+    panel.grid.major.x = element_blank(),
+    panel.grid.minor = element_blank(),
+    panel.grid.major.y = element_line(linewidth = 0.3),
+    legend.position = "right",
+    plot.margin = margin(10, 15, 10, 10)
+  )
+
+plot_to_save
+
+```
+
+```{r}
+ggsave( filename = "plotContrib.pdf", # target file
+        plot = plot_to_save, # object to export 
+        width = 8, # inches (adjust as needed
+        height = 5, # inches 
+        units = "in", # units for width/height 
+        dpi = 300, # resolution (good for print) 
+        device = "pdf") # ensures PDF output
+```
+
+```{r}
+unique(resLmpContributions$plotContrib$data[[1]])
+
+```
+
+```{r}
+resLmpContributions <- lmpContributions(resASCA)
+pander::pander(resLmpContributions$totalContribTable)
+
+```
+
+```{r}
+pander::pander(resLmpContributions$effectTable)
+
+```
+
+```{r}
+
+# Scores Plot for the hippurate
+lmpScorePlot(resASCA,
+
+)
+```
+
+```{r}
+library(stringr)
+library(ggplot2)
+
+# Robust rename map: make sure keys match what is actually in the plot labels
+rename_map <- c(
+  "transportDays\nPC1"     = "Transport Days PC1",
+  "urbanrural_y\nPC1"      = "Urban or Rural PC1",
+  "bmi_simple\nPC1"        = "BMI PC1",
+  "season\nPC1"            = "Season PC1",
+  "sge\nPC1"               = "Age PC1",
+  "FURANIMAL\nPC1"         = "Animal Possession PC1",
+  "heavy_drinking\nPC1"    = "Alcohol Consumption PC1",
+  "Sex\nPC1"               = "Gender PC1",
+  "All_forms_of_pain\nPC1" = "Pain PC1"
+)
+
+# Helper: normalize newline spacing so "...\n PC1" and "...\nPC1" match
+normalize_key <- function(z) {
+  z %>%
+    str_replace_all("\\s*\\n\\s*", "\n") %>%  # normalize spaces around newline
+    str_squish()
+}
+
+# Apply renaming + wrapping to x-axis labels
+plot_to_save <- resLmpContributions$plotContrib +
+  scale_x_discrete(labels = function(x) {
+    x_norm <- normalize_key(x)
+    x_ren  <- ifelse(x_norm %in% names(rename_map), rename_map[x_norm], x_norm)
+    str_wrap(x_ren, width = 18)
+  }) +
+  theme_minimal(base_size = 12) +
+  theme(
+    axis.text.x = element_text(angle = 35, hjust = 1, vjust = 1, size = 10),
+    axis.text.y = element_text(size = 10),
+    axis.title  = element_text(size = 12),
+    plot.title  = element_text(size = 14, hjust = 0),
+    plot.subtitle = element_text(size = 12, hjust = 0),
+    panel.grid.major.x = element_blank(),
+    panel.grid.minor   = element_blank(),
+    panel.grid.major.y = element_line(linewidth = 0.3),
+    legend.position    = "right",
+    plot.margin        = margin(10, 15, 10, 10)
+  )
+
+plot_to_save
+
+```

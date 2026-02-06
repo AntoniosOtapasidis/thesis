@@ -1,0 +1,597 @@
+---
+title: "procrustes/spls"
+format: html
+editor: visual
+---
+
+PLS is particularly efficient when *P + Q \> N*, where *P* is the number of variables in the first dataset, *Q* is the number of variables in the second dataset and *N* is the number of samples in each. Hence, it is an extremely powerful algorithm when dealing with omics data, which commonly has high dimensionality and contains correlated variables.
+
+sPLS (it is more suitable for high dimensional data)
+
+what is different with PLS? This is done by including the LASSO penalisation on loading vectors to reduce the number of original variables used when constructing latent variable
+
+```{r}
+library(ggplot2)
+library(tidyverse)
+library(tidyr)
+## install BiocManager if not installed 
+if (!requireNamespace("BiocManager", quietly = TRUE))    
+#install.packages("BiocManager")
+## then install mixOmics
+#BiocManager::install("mixOmics")
+library(mixOmics)
+library(vegan)
+
+```
+
+```{r}
+metabolites <- read.table("~/data/metabolites.known.tsv", sep = "\t", header = TRUE, row.names = 1)
+metabolites
+
+```
+
+```{r}
+library(readr)
+
+bacteriome <- read.table("~/data/virome.processed.tsv",sep = "\t", header =TRUE,row.names = 1, check.names = FALSE)
+#bacteriome
+
+
+#rn <- sub("^s__[[:space:]]*", "", rownames(bacteriome))
+#rn[rn == "" | is.na(rn)] <- "Unknown"
+#rownames(bacteriome) <- rn
+rownames(bacteriome)[grepl("^s__$", rownames(bacteriome))] <- "Unknown"
+
+bacteriome
+
+```
+
+### make the data paired
+
+```{r}
+
+# Case A: you have a row ID column 
+bacteriome_T <- as.data.frame(t(bacteriome))
+# Suppose your dataframe is called df
+# base R
+#colnames(bacteriome_T) <- bacteriome_T[1, ]   # take first row as column names
+#bacteriome_T <- bacteriome_T[-1, ]            # remove the first row
+               # Remove that first row
+
+
+bacteriome_T
+```
+
+```{r}
+sum(is.na(metabolites[[id_col]]))
+
+```
+
+```{r}
+library(tidyverse)
+
+id_col <-"id"
+# 3) Move IDs to rownames in metabolites and drop the ID column
+metabolites2 <- as.data.frame(metabolites, check.names = FALSE)
+rownames(metabolites2) <- as.character(metabolites2[[id_col]])
+metabolites2[[id_col]] <- NULL
+
+```
+
+```{r}
+
+# 4) Ensure both objects are data.frames with IDs as rownames
+bacteriome<- as.data.frame(bacteriome_T, check.names = FALSE)
+metabolites2  <- as.data.frame(metabolites2,  check.names = FALSE)
+
+```
+
+```{r}
+#rownames(bacteriome) <- bacteriome[[1]]
+#bacteriome <- bacteriome[ , -1]
+#bacteriome
+```
+
+```{r}
+# 5) Keep only matching IDs and sort them identically
+common_ids <- intersect(rownames(bacteriome), rownames(metabolites2))
+
+if (length(common_ids) == 0) {
+  stop("No matching IDs between bacteriome columns and metabolite ID column.")
+}
+
+common_ids <- sort(common_ids)
+
+bacteriome_aligned  <- bacteriome [common_ids, , drop = FALSE]
+metabolome_aligned  <- metabolites2 [common_ids, , drop = FALSE]
+
+```
+
+```{r}
+dim(bacteriome_aligned)
+dim(metabolome_aligned)
+
+```
+
+```{r}
+bacteriome <- bacteriome_aligned
+metabolome <- metabolome_aligned
+
+head(bacteriome)
+head(metabolome)
+```
+
+Process the bacterial data first 0.01 cuml multiplicative
+
+```{r}
+bacteriome_T <-t(bacteriome)
+bacteriome_T <-as.data.frame(bacteriome_T)
+bacteriome_T
+```
+
+Prefiltering of the bacterial data
+
+```{r}
+# remove any old num_cols from the workspace
+min_present <- ceiling(0.10 * ncol(bacteriome_T))  # 10% of individuals
+
+present_counts <- rowSums(
+  bacteriome_T != 0 & !is.na(bacteriome_T)
+)
+
+bacteriome_filtered <- bacteriome_T[present_counts >= min_present, ]
+
+dim(bacteriome_filtered)
+
+bacteriome <- bacteriome_filtered
+bacteriome
+
+```
+
+Back to the Spls
+
+```{r}
+num_cols <- sapply(metabolome, is.numeric)
+metabolome[num_cols] <- lapply(metabolome[num_cols], function(x) log10(x + 1))
+
+
+metabolome
+```
+
+```{r}
+bacteriome <- as.data.frame(t(bacteriome))
+
+dim(bacteriome)
+dim(metabolome)
+
+```
+
+After preprocessing 654 bacteria remaining
+
+we are ready to proceed with the spls regression model <https://mixomics.org/methods/spls/>
+
+**Projection to Latent Structures (PLS)**, also known as Partial Least Squares, is used to explore and explain the relationship between two datasets by calculating **latent components** that maximise **covariance**. in sparse PLS regression a lasso penalization is applied to the loading vectos to identify the most predictive variables
+
+we used pls2 of the mixomics package since we performed multiovariate analaysis. This it the vignette to run the sPLS2 regression using two omic layers: <https://mixomics.org/case-studies/spls-liver-toxicity-case-study-2/>
+
+sPLS is used to explore the relationship beteen two dataset by seleting the variables that lead to the maximum coveriance.
+
+```{r}
+library(mixOmics)
+set.seed(12345)
+
+```
+
+```{r}
+bacteriome <- data.frame(lapply(bacteriome, as.numeric))
+metabolome <- data.frame(lapply(metabolome, as.numeric))
+
+X <- data.frame(bacteriome)
+Y <- data.frame(metabolome)
+
+rownames(X) <- NULL
+rownames(Y) <- NULL
+```
+
+```{r}
+dim(bacteriome)
+dim(metabolome)
+```
+
+```{r}
+#pca.bacteriome <- pca(X, ncomp =10, scale = TRUE,center = TRUE)
+#pca.metabolites <-pca(Y, ncomp = 10, scale = TRUE,center = TRUE)
+```
+
+```{r}
+#pca.bacteriome <- pca(X, ncomp =10,scale = TRUE,center = TRUE)
+#pca.metabolites <-pca(Y, ncomp = 10, scale = TRUE,center = TRUE)
+#pdf("pca_bacteriome.pdf")
+#plot(pca.bacteriome)
+
+#dev.off()
+
+#pdf("pca_metabolites.pdf")
+#plot(pca.metabolites)
+#dev.off()
+
+```
+
+### First we test the entire dataset with PLS do define the Q2 contained in it 0.1079 0.0037
+
+```{r}
+#X<- scale(X,scale = TRUE, center= TRUE)
+#Y <- scale(Y,scale = TRUE, center= TRUE)
+
+pls.model <- pls(X = X, Y = Y, ncomp = 5, mode = 'regression', max.iter =1000, near.zero.var = TRUE, scale = TRUE)
+
+png("../bacteriome/CLR_metabolitesQ2_plot_MAG_pofiles_metabolome_no_normalization.png", width = 12, height = 10, units = "in", res = 300)
+
+set.seed(33)  
+Q2.pls2.model <- perf(pls.model, validation = 'Mfold', folds = 10, 
+                      nrepeat = 10)
+
+```
+
+```{r}
+plot(Q2.pls2.model, criterion = 'Q2.total')
+
+```
+
+```{r}
+# raw Q2 (per repeat × component)
+Q2.pls2.model$measures$Q2.total
+
+```
+
+|     |     |
+|----:|----:|
+|     |     |
+
+```{r}
+list.keepX <- c(seq(10, 50,5))
+list.keepY <- c(seq(5,25,5))
+```
+
+```{r}
+library(BiocParallel)
+set.seed(33)
+
+tune.spls.model.trial <- tune.spls(X, Y,
+                                   test.keepX = list.keepX,
+                                   test.keepY = list.keepY,
+                                   ncomp = 2,
+                                   nrepeat = 10, folds = 10,
+                                   mode = 'regression',
+                                   measure = 'cor',max.iter=1000,near.zero.var = TRUE,scale = TRUE,
+                                   BPPARAM = BiocParallel::SerialParam()
+                                  
+)
+plot(tune.spls.model.trial)
+```
+
+```{r}
+tune.spls.model.trial$choice.keepX
+tune.spls.model.trial$choice.keepY
+```
+
+```{r}
+choice.keepX <- tune.spls.model.trial$choice.keepX 
+
+# extract optimal number of variables for Y datafram
+choice.keepY <- tune.spls.model.trial$choice.keepY
+
+optimal.ncomp <-  length(choice.keepX)
+
+final.spls.model <- spls(X, Y, ncomp = 2, 
+                    keepX = choice.keepX,
+                    keepY = choice.keepY,scale = TRUE,
+                    mode = "regression", near.zero.var = TRUE)
+```
+
+```{r}
+final.spls.model$prop_expl_var
+
+```
+
+```{r}
+png("../Q2_plot_MAG_pofiles_metabolome_no_normalization_spls.png", width = 12, height = 10, units = "in", res = 300)
+
+set.seed(42)
+pe <- perf(final.spls.model, validation = "Mfold", folds = 10, nrepeat = 10, progressBar = FALSE,near.zero.var = TRUE,scale = TRUE)
+plot(pe, criterion = 'Q2.total')
+
+dev.off()
+
+```
+
+### Bacteria-Metabolites
+
+(
+
+|     |     |             |             |
+|:----|----:|------------:|------------:|
+| Y   |   1 |  0.12259139 | 0.005919015 |
+| Y   |   2 | -0.04247685 | 0.012997039 |
+
+)
+
+Virome
+
+|     |     |             |             |
+|:----|----:|------------:|------------:|
+| Y   |   1 |  0.04802175 | 0.006130024 |
+| Y   |   2 | -0.08766801 | 0.008419584 |
+
+```{r}
+
+pe$measures$Q2.total
+```
+
+### Evaluate sparsity
+
+You can inspect which features were selected (nonzero loadings):
+
+```{r}
+selectVar(final.spls.model, comp = 1)$X$value
+
+```
+
+```{r}
+pe$measures$Q2.total
+
+```
+
+Stability of the model
+
+```{r}
+
+stab.pe.comp1 <- pe$features$stability.X$comp1
+# Averaged stability of the X selected features across CV runs, as shown in Table
+stab.pe.comp1[1:choice.keepX[1]]
+
+# We extract the stability measures of only the variables selected in spls2.liver
+extr.stab.pe.comp1 <- stab.pe.comp1[selectVar(final.spls.model,                                                                  comp =1)$X$name] 
+                     
+```
+
+```{Bacteriome model STABILITY. Stability measure (occurence of selection) of the bottom 20 variables from X selected with sPLS2 across repeated 10-fold subsampling on component 1}
+ s__Blautia_A.wexlerae 
+                          1.00 
+         s__Dorea_A.amylophila 
+                          1.00 
+  s__Mediterraneibacter.faecis 
+                          1.00 
+ s__Oliverpabstia.intestinalis 
+                          1.00 
+  s__Anaerobutyricum.stercoris 
+                          0.99 
+          s__Bariatricus.comes 
+                          0.99 
+s__Hominicoprocola.sp900317525 
+                          0.97 
+     s__Vescimonas.sp000435555 
+                          0.94 
+     s__Anaerobutyricum.hallii 
+                          0.58 
+          s__Phil1.sp001940855 
+                          0.47 
+```
+
+#### as we see as it was adicipated the variance explained by first component of the X matrix is family\> genus \> species. This is not unexpected as the family is in higher order compared to the genus and species. on the other hand the Y matrix has very minimal alterations in the variance explained by the first pc. this is also anticipated since the data representing the Y matrix remained the same across all of the experiments
+
+```{r}
+# Coerce loadings to numeric vector
+xload_comp1 <- as.numeric(final.spls.model$loadings$X[, 1])
+df <- data.frame(
+  variable = rownames(final.spls.model$loadings$X),
+  loading = xload_comp1
+)
+
+# Keep only nonzero loadings
+df <- df[df$loading != 0 & !is.na(df$loading), ]
+
+# Plot
+p <- ggplot(df, aes(x = reorder(variable, loading), y = loading, fill = loading)) +
+  geom_col() +
+  coord_flip() +
+  scale_fill_gradient2(low = "blue", mid = "white", high = "red") +
+  labs( x = "Bacterial Species", y = "Loadings") +
+  theme_minimal() +
+    theme(axis.text.y = element_text(size = 12))   # smaller font for variables
+#ggsave("spls_X__MAG_loadings_species_level_no_normalization.pdf", plot = p, width = 8, height = 6)
+
+
+
+p
+library(ggplot2)
+
+# Extract loadings
+xload_comp1 <- as.numeric(final.spls.model$loadings$X[, 1])
+df <- data.frame(
+  variable = rownames(final.spls.model$loadings$X),
+  loading = xload_comp1
+)
+
+# Keep only nonzero loadings
+df <- df[df$loading != 0 & !is.na(df$loading), ]
+
+p <- ggplot(df, aes(x = reorder(variable, loading), y = loading, fill = loading)) +
+  geom_col(width = 0.7) +
+  coord_flip() +
+  scale_fill_gradient2(
+    low = "blue", 
+    mid = "lightgray", 
+    high = "red",
+    midpoint = 0
+  ) +
+  labs(
+    x = "Bacterial Species", 
+    y = "Loadings",
+    fill = "Loading"
+  ) +
+  theme_minimal(base_size = 11) +
+  theme(
+    panel.grid.major.y = element_line(color = "white", size = 0.5),
+    panel.grid.minor.y = element_blank(),
+    panel.grid.major.x = element_line(color = "white", size = 0.5),
+    panel.grid.minor.x = element_blank(),
+    panel.background = element_rect(fill = "white", color = NA),
+    plot.background = element_rect(fill = "white", color = NA),
+    axis.text.y = element_text(size = 12),
+    axis.text.x = element_text(size = 10),
+    axis.title = element_text(size = 11),
+    plot.margin = margin(5, 5, 5, 5, "pt"),
+    legend.position = "right",
+    legend.background = element_rect(fill = "white", color = NA),
+    legend.key.height = unit(0.8, "cm")
+  )
+
+# Check that it really is a ggplot
+class(p)
+print(p)
+
+ggsave(
+  "saspls_X__MAG_loadings_species_level_no_normalization.pdf", 
+  plot = p, 
+  width = 8, 
+  height = 6,
+  dpi = 300,
+  device = cairo_pdf
+)
+
+p
+
+
+```
+
+```{r}
+# Coerce loadings to numeric vector
+yload_comp1 <- as.numeric(final.spls.model$loadings$Y[, 1])
+df <- data.frame(
+  variable = rownames(final.spls.model$loadings$Y),
+  loading = yload_comp1
+)
+
+# Keep only nonzero loadings
+df <- df[df$loading != 0 & !is.na(df$loading), ]
+
+# Plot
+p2 <- ggplot(df, aes(x = reorder(variable, loading), y = loading, fill = loading)) +
+  geom_col(width = 0.7) +
+  coord_flip() +
+  scale_fill_gradient2(
+    low = "blue",
+    mid = "grey",
+    high = "red",
+    midpoint = 0
+  ) +
+  labs(
+    x = "Metabolites",
+    y = "Loadings",
+    fill = "Loading"
+  ) +
+  theme_minimal(base_size = 11) +
+  theme(
+    panel.grid.major.y = element_line(color = "white", size = 0.5),
+    panel.grid.minor.y = element_blank(),
+    panel.grid.major.x = element_line(color = "grey90", size = 0.5),
+    panel.grid.minor.x = element_blank(),
+    panel.background = element_rect(fill = "white", color = NA),
+    plot.background = element_rect(fill = "white", color = NA),
+    axis.text.y = element_text(size = 12),
+    axis.text.x = element_text(size = 10),
+    axis.title = element_text(size = 11),
+    plot.margin = margin(5, 5, 5, 5, "pt"),
+    legend.position = "right",
+    legend.background = element_rect(fill = "white", color = NA),
+    legend.key.height = unit(0.8, "cm")
+  )
+
+ggsave(
+  "spls_Y_loadings_MAG_comp1_metabolites_species_level_n_normalization.pdf",
+  plot = p2,
+  width = 8,
+  height = 6,
+  dpi = 300,
+  device = cairo_pdf
+)
+
+p2
+
+
+```
+
+```{r}
+
+pdf("cim_plot_MAG_species_metabolome_no_normalization.pdf",
+    width = 24, height = 30, paper = "special", onefile = TRUE)
+
+cim_res <- cim(
+  final.spls.model,
+  comp = 1:2,
+  ylab = "Bacterial Species",
+  xlab = "metabolites",
+  color = colorRampPalette(c("blue", "white", "red"))(101),
+  margins = c(10, 30)    # bottom, left — give labels room
+)
+
+dev.off()
+
+
+
+
+```
+
+## Compare the feature selection
+
+we consider sPLS2 and PLS2 that includes all variables, to give insights into the different methods.
+
+```{r}
+ #Comparisons of final models (PLS, sPLS)
+
+## PLS
+pls.model <- pls(X, Y, mode = 'regression', ncomp = 2)
+perf.pls.model <-  perf(pls.model, validation = 'Mfold', folds = 10, 
+                        nrepeat = 10)
+
+## Performance for the sPLS model ran earlier
+perf.spls.model <-  perf(final.spls.model, validation = 'Mfold', folds = 10, 
+                         nrepeat = 10)
+```
+
+```{r}
+pdf("mON_pls_comparison_plot_species.pdf", width = 12, height = 10)
+plot(c(1,2), perf.pls.model$measures$cor.upred$summary$mean, 
+     col = 'blue', pch = 16, 
+     ylim = c(0.6,1), xaxt = 'n',
+     xlab = 'Component', ylab = 't or u Cor', 
+     main = 's/PLS performance based on Correlation (Species-level)')
+axis(1, 1:2)  # X-axis label
+points(perf.pls.model$measures$cor.tpred$summary$mean, col = 'red', pch = 16)
+points(perf.spls.model$measures$cor.upred$summary$mean, col = 'blue', pch = 17)
+points(perf.spls.model$measures$cor.tpred$summary$mean, col = 'red', pch = 17)
+legend('bottomleft', col = c('blue', 'red', 'blue', 'red'), 
+       pch = c(16, 16, 17, 17), c('u PLS', 't PLS', 'u sPLS', 't sPLS'))
+```
+
+```         
+```
+
+Get the heatmap csv (comparison with the other techniques)
+
+```{r}
+cor_mat <- cim_res$mat.cor
+
+# convert to long-format table
+cor_table <- as.data.frame(as.table(cor_mat))
+colnames(cor_table) <- c("Bacterial_Species", "Metabolite", "Correlation")
+
+# inspect or save
+head(cor_table)
+```
+
+```{r}
+write.csv(cor_table, "bacteria_metabolite_correlations.csv", row.names = FALSE)
+
+```
