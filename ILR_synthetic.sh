@@ -3,7 +3,7 @@
 RSCRIPT=/users/antonios/miniconda3/envs/r-metabo/bin/Rscript
 
 # Run from the synthetic directory
-cd "$(dirname "$0")/R/synthetic"
+cd "$(dirname "$0")/R/synthetic_generation"
 
 # Step 1: Generate synthetic community data
 echo "=== Step 1: Generating synthetic community ==="
