@@ -533,14 +533,15 @@ def main():
     #So their effective “Y weight” is exactly zero for every virus
 
     if args.dataset == "COPSAC_clone":
+        _data_dir = os.path.join(os.path.dirname(__file__), "data", "synthetic_copsac")
         df_X1 = pd.read_csv(
-            "/users/antonios/LEAF_revisit/LEAF/COPSAC_clone/X1_bacteria_synthetic_CLR_COPSAC.csv"
+            os.path.join(_data_dir, "X1_bacteria_synthetic_CLR_COPSAC.csv")
         )
         df_X2 = pd.read_csv(
-            "/users/antonios/LEAF_revisit/LEAF/COPSAC_clone/X2_viruses_synthetic_CLR_COPSAC.csv"
+            os.path.join(_data_dir, "X2_viruses_synthetic_CLR_COPSAC.csv")
         )
         df_Y = pd.read_csv(
-            "/users/antonios/LEAF_revisit/LEAF/COPSAC_clone/Y_metabolites_log_synthetic_complex_RA.csv"
+            os.path.join(_data_dir, "Y_metabolites_log_synthetic_complex_RA.csv")
         )
 
 
@@ -579,7 +580,7 @@ def main():
 
         # 3) load GT variance shares from R
         df_gt = pd.read_csv(
-            "/users/antonios/LEAF_revisit/LEAF/COPSAC_clone/GT_virome_variance_shares_complex.csv"
+            os.path.join(_data_dir, "GT_virome_variance_shares_complex.csv")
         )
 
         # ensure metabolite ordering in GT matches Y columns
@@ -1670,7 +1671,7 @@ def main():
 
     final_table = final_table.reindex(columns=cols)
     run_id = datetime.now().strftime("%Y%m%d-%H%M%S")
-    out_dir = "/users/antonios/LEAF_revisit/LEAF/COPSAC_clone/k_50/1000_kappa_/"
+    out_dir = os.path.join(os.path.dirname(__file__), "results_synthetic_task")
     os.makedirs(out_dir, exist_ok=True)
     out_path = os.path.join(
         out_dir,

@@ -377,14 +377,15 @@ def main():
         }, allow_val_change=True)
 
     elif args.dataset == "microbiome_synthetic":
+        _conf_dir = os.path.join(os.path.dirname(__file__), "data", "synthetic_confounders")
         df_X1 = pd.read_csv(
-            "/users/antonios/LEAF_revisit/synthetic_microbiome/Bayesian-inference-of-bacteria-metabolite-interactions/complex_model/confounders/X1_bacteria_synthetic_CLR_confounders.csv"
+            os.path.join(_conf_dir, "X1_bacteria_synthetic_CLR_confounders.csv")
         )
         df_X2 = pd.read_csv(
-            "/users/antonios/LEAF_revisit/synthetic_microbiome/Bayesian-inference-of-bacteria-metabolite-interactions/complex_model/confounders/X2_viruses_synthetic_CLR_confounders.csv"
+            os.path.join(_conf_dir, "X2_viruses_synthetic_CLR_confounders.csv")
         )
         df_Y = pd.read_csv(
-            "/users/antonios/LEAF_revisit/synthetic_microbiome/Bayesian-inference-of-bacteria-metabolite-interactions/complex_model/confounders/Y_metabolites_log_synthetic_complex_sparse_confounders.csv"
+            os.path.join(_conf_dir, "Y_metabolites_log_synthetic_complex_sparse_confounders.csv")
         )
 
 
@@ -405,7 +406,7 @@ def main():
         df_Y  = df_Y.loc[common_idx]
         # 2b) load confounders (LEAF-style: C is a dim_C vector per sample)
         df_C = pd.read_csv(
-            "/users/antonios/LEAF_revisit/synthetic_microbiome/Bayesian-inference-of-bacteria-metabolite-interactions/complex_model/confounders/confounders_vector_complex_sparse.csv"
+            os.path.join(_conf_dir, "confounders_vector_complex_sparse.csv")
         ).set_index("sim")
 
         df_C = df_C.loc[common_idx]
@@ -440,7 +441,7 @@ def main():
 
         # 3) load GT variance shares from R
         df_gt = pd.read_csv(
-            "/users/antonios/LEAF_revisit/synthetic_microbiome/Bayesian-inference-of-bacteria-metabolite-interactions/complex_model/confounders/GT_virome_variance_shares_complex_sparse_confounders.csv"
+            os.path.join(_conf_dir, "GT_virome_variance_shares_complex_sparse_confounders.csv")
         )
 
         # ensure metabolite ordering in GT matches Y columns
@@ -814,7 +815,7 @@ def main():
         zs1_res_test.to(device), confounders_te, Y_error=Y_error_te.to(device), divide_by_total_var=False
     ).cpu()
 
-    out_dir = "/users/antonios/LEAF_revisit/LEAF/leaf_synthetic"
+    out_dir = os.path.join(os.path.dirname(__file__), "results_synthetic_task")
 
         # ---- SAVE PREDICTIONS FOR PLOTTING + COMPUTE TEST R2 ----
     Y_test_np = Y_test.detach().cpu().numpy()
@@ -869,7 +870,7 @@ def main():
     final_table = df_piv.merge(gt_unique, on=["outcome","component"], how="left")
     cols = ["outcome","component","gt_fraction","train","test","est_fraction_mean"]
     final_table = final_table.reindex(columns=cols)
-    out_path = f"/users/antonios/LEAF_revisit/LEAF/leaf_synthetic/variance_comparison_{MODEL_NAME}_train_test.csv"
+    out_path = os.path.join(out_dir, f"variance_comparison_{MODEL_NAME}_train_test.csv")
     os.makedirs("data/disentangled", exist_ok=True)
     final_table.to_csv(out_path, index=False)
     print("Wrote:", out_path)
