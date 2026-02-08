@@ -78,3 +78,57 @@ python run_leaf_non_linear.py --dataset microbiome_synthetic_ilr --beta 0.1 --se
 - **Neural Decomposition**: Additive decoder Y = f1(Z1) + f2(Z2) + fc(Zc) with zero-sum constraints enforced via augmented Lagrangian (MDMM), enabling clean variance decomposition.
 - **Permutation testing**: Null distributions built by retraining the decoder on shuffled latent-outcome pairings to assess statistical significance of variance attributions.
 - **Kendall's W**: Concordance analysis across random seeds to assess ranking stability per metabolite.
+
+## Generative Model
+
+The synthetic data follow the structural causal model:
+
+```
+Y = W1 * Z1 + W2 * Z2 + Ws * Zs + noise
+```
+
+Where:
+- **Z1, Z2, Zs**: Bacteria-specific, virus-specific, and shared latent factors
+- **W1 = -(Cij %*% A1_s)**: Bacteria-to-metabolite weight matrix (via consumption rates)
+- **W2 = -(C_virus %*% A2_s)**: Virus-to-metabolite weight matrix (via AMG effects)
+- **Ws**: Random Gaussian weight matrix for shared effects
+- **A1_s, A2_s**: Loading matrices mapping latent factors to observed taxa (X1, X2)
+
+The confounder variant (`confounder_included.R`) extends this to:
+
+```
+Y = W1 * Z1 + W2 * Z2 + Ws * Zs + Wc * C + noise
+```
+
+## Experiments
+
+### 1. Synthetic COPSAC (`complex_synthetic_community.R`)
+
+Generates a synthetic community matching the COPSAC2000 cohort dimensions (200 bacteria, 200 viruses, 100 metabolites). Uses `set.seed(69)`. Outputs relative abundance data with `*_COPSAC.csv` suffix.
+
+Output files: `X1_bacteria_synthetic_RA_complex_COPSAC.csv`, `X2_viruses_synthetic_RA_complex_COPSAC.csv`, `Y_metabolites_log_synthetic_complex_RA_COPSAC.csv`, `Z{1,2,s}_latents_RA_complex_COPSAC.csv`, `GT_virome_variance_shares_complex_COPSAC.csv`
+
+### 2. Sparse AMG variant (`complex_sparse_community.R`)
+
+Same generative model but with sparse AMG assignment (1-3 AMGs per virus). Uses `set.seed(69)`. Outputs with `*_complex_sparse.csv` suffix.
+
+Output files: `X1_bacteria_synthetic_RA_complex_sparse.csv`, `X2_viruses_synthetic_RA_complex_sparse.csv`, `Y_metabolites_log_synthetic_complex_sparse.csv`, `Z{1,2,s}_latents_RA_complex_sparse.csv`, `GT_virome_variance_shares_complex_sparse.csv`
+
+### 3. Confounder experiment (`confounder_included.R`)
+
+Extends the sparse model with a confounding variable (C) that has a direct effect on metabolites via Wc. Uses `set.seed(123)`. Also generates confounded latent representations (Z_tilde). Outputs with `*_confounders.csv` suffix.
+
+Output files: `X1_bacteria_synthetic_RA_complex_sparse_confounders.csv`, `X2_viruses_synthetic_RA_complex_sparse_condounders.csv`, `Y_metabolites_log_synthetic_complex_sparse_confounders.csv`, `Z{1,2,s}_latents_RA_complex_sparse_confounders.csv`, `Z{1,2,s}_tilde_latents_RA_complex_sparse_confounders.csv`, `confounders_vector_complex_sparse.csv`, `GT_virome_variance_shares_complex_sparse_confounders.csv`
+
+### 4. Non-linear variant (`non_linear.R`)
+
+Non-linear extension of the confounder model. **Note:** outputs the same filenames as `confounder_included.R` (`*_confounders.csv`), so they will overwrite each other if run in the same directory.
+
+## Datasets
+
+Each script generates:
+- **X1**: Bacterial relative abundances (200 bacteria, N=1000 samples)
+- **X2**: Viral relative abundances (200 viruses, N=1000 samples)
+- **Y**: Log-transformed metabolite concentrations (100 metabolites)
+- **Z1, Z2, Zs**: Ground-truth latent factors
+- **GT_virome_variance_shares**: Ground-truth variance decomposition per metabolite

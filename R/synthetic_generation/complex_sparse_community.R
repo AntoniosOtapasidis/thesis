@@ -24,9 +24,9 @@ cat("All libraries loaded successfully\n")
 ################################################################################
 # 
 # Zs represents environmental and host factors that affect BOTH:
-# - Bacterial community composition (via As1)
-# - Viral community composition (via As2)
-# - Microbial metabolism rates (via Ws = -(C_bac %*% As1 + C_amg %*% As2))
+# - Bacterial community composition (via As1_shared)
+# - Viral community composition (via As2_shared)
+# - Metabolite outcomes (via Ws, a random Gaussian weight matrix)
 #
 # Examples of factors captured by Zs:
 # - Environmental: pH, temperature, oxygen, nutrient availability
@@ -36,7 +36,7 @@ cat("All libraries loaded successfully\n")
 # Key properties:
 # 1. Same Zs value affects both bacteria and viruses in each sample
 # 2. Creates correlation between X1 (bacteria) and X2 (viruses)
-# 3. Affects metabolites indirectly through microbial metabolism
+# 3. Affects metabolites directly through Ws weight matrix
 #
 ################################################################################
 
@@ -89,7 +89,7 @@ target_frac <- 0.1   # max expected depletion is 10 percent of minimal M0
 detection_limit <- 1e-6  # Minimum detectable relative abundance for X1 and X2  
 cat(sprintf("N_met: %d, N_bac: %d, N_vir: %d\n", N_met, N_bac, N_vir))
 cat(sprintf("Number of simulations: %d\n", n_sims))
-cat(sprintf("Random seed: 42\n"))
+cat(sprintf("Random seed: 69\n"))
 
 ################################################################################
 # LATENT FACTOR STRUCTURE DEFINITION
@@ -118,17 +118,16 @@ cat(sprintf("dim_Zc (shared/common): %d, dim_Z1_s (bacteria-specific): %d, dim_Z
 # ============================================================
 
 
-# For metabolite generation, we still need separate weight matrices
-# These map latents directly to metabolites (not through X1/X2)
-# Bacteria-specific: Z1_s - X1
+# Loading matrices map latent factors to observed taxa (X1, X2)
+# Bacteria-specific: Z1_s → X1
 
 
  # We are taking the positive loadings from a Guassian distribution with positive values
 A1_s <- matrix(rnorm(N_bac * dim_Z1_s, sd = 1), 
                nrow = N_bac, ncol = dim_Z1_s)
 
-# Virus-specific: Z2_s - X2
-A2_s <- matrix(rnorm(N_vir * dim_Z2_s, sd = 1), 
+# Virus-specific: Z2_s → X2
+A2_s <- matrix(rnorm(N_vir * dim_Z2_s, sd = 1),
                nrow = N_vir, ncol = dim_Z2_s)
 
 # # Shared: Zc - BOTH bacteria and viruses (SAME matrix = disentanglement key)
@@ -142,10 +141,10 @@ As2_shared <- matrix(rnorm(N_vir * dim_Zc, sd = 1),
 As_shared <- matrix(rnorm(N_bac * dim_Zc, sd=1), nrow=N_bac, ncol=dim_Zc)
 
 
-cat(sprintf("\n=== Metabolite Loading Matrices ===\n"))
-cat(sprintf("  A1_s: %d x %d (bacteria-specific → metabolites)\n",
+cat(sprintf("\n=== Loading Matrices (latents → taxa) ===\n"))
+cat(sprintf("  A1_s: %d x %d (bacteria-specific latents → bacteria)\n",
             nrow(A1_s), ncol(A1_s)))
-cat(sprintf("  A2_s: %d x %d (virus-specific → metabolites)\n",
+cat(sprintf("  A2_s: %d x %d (virus-specific latents → viruses)\n",
             nrow(A2_s), ncol(A2_s)))
 # cat(sprintf("  Ac: %d x %d (shared → metabolites)\n",
 #             nrow(Ac), ncol(Ac)))
@@ -207,7 +206,7 @@ cat("\n=== COMPUTING WEIGHT MATRICES (W1, W2, Ws) FROM CONSUMPTION ===\n")
 # - met_B (1-30):    Bacteria-dominated metabolites
 # - met_V (31-60):   Virus-dominated metabolites (via AMGs)
 # - met_S (61-90):   Shared metabolites (both bacteria and virus effects)
-# - met_N (91-100):  Noise metabolites (minimal signal)
+# - met_N (91-100):  Noise metabolites (no signal, zero bacterial interactions)
 ################################################################################
 
 # ============================================================
@@ -220,7 +219,7 @@ consumed_metabolites <- 1:N_met
 
 ## ---------- metabolite groups by index ----------
 # Four main groups based on what drives their variance:
-met_B <- 1:30            # bacteria-dominated (host-dominated)
+met_B <- 1:30            # bacteria-dominated
 met_V <- 31:60           # virus-dominated
 met_S <- 61:90           # shared (both bacteria and virus)
 met_N <- 91:100          # noise / null (minimal signal)
@@ -251,7 +250,7 @@ cat(sprintf("  - Noise/Null (met_N): %d metabolites (%d-%d)\n",
 # - met_B: High baseline (bacteria-driven)
 # - met_V: Low baseline (will be boosted by viral AMGs)
 # - met_S: Moderate baseline (both contribute)
-# - met_N: Very low baseline (noise)
+# - met_N: Zero (no bacterial interactions)
 ################################################################################
 
 # ============================================================
@@ -366,11 +365,12 @@ cat(sprintf("  met_N (noise): mean=%.1f bacteria per metabolite (should be 0)\n"
 ################################################################################
 # AUXILIARY METABOLITE GENES (AMG) CONFIGURATION
 ################################################################################
-# AMGs are viral genes that enhance metabolite consumption when bacteria are infected
+# AMGs are viral genes that boost metabolite consumption
 # This section defines:
-# - Which metabolites are affected by AMGs (V_amg and S_amg)
-# - Which viruses carry which AMGs (vir_V and vir_S)
+# - Which metabolites are eligible for AMG effects (V_amg and S_amg)
 # - The strength of AMG effects (min_boost and max_boost)
+# Note: vir_V and vir_S are defined but unused; actual AMG assignment
+# loops over all viruses and samples uniformly from amg_metabolites
 ################################################################################
 
 # ============================================================
@@ -400,18 +400,17 @@ cat(sprintf("AMG boost range: [%.6f, %.6f]\n", min_boost, max_boost))
 ################################################################################
 # VIRUS-METABOLITE INTERACTION MATRIX (C_virus / AMG EFFECTS)
 ################################################################################
-# ALGORITHM: Probabilistic AMG assignment
+# ALGORITHM: Sparse AMG assignment
 #
 # C_virus[i, v] = AMG boost from virus v on metabolite i
 #
 # Process:
 # 1. Initialize C_virus matrix (N_met x N_vir) with zeros
-# 2. Ensure no AMG effects on bacteria-dominated metabolites (met_B)
-# 3. For each virus in vir_V: probabilistically assign AMG boosts to met_V
-# 4. For each virus in vir_S: probabilistically assign AMG boosts to met_S
-#
-# Each virus targets a random subset (p=0.8) of metabolites in its group
-# with boost strengths drawn uniformly from [min_boost, max_boost]
+# 2. Ensure no AMG effects on bacteria-dominated (met_B) or noise (met_N) metabolites
+# 3. For each virus (1:N_vir): assign 1-3 AMGs sampled uniformly from
+#    amg_metabolites = c(met_V, met_S)
+# 4. Each AMG is randomly classified as "shared" (60%) or "overtake" (40%)
+#    with different boost strengths
 ################################################################################
 
 ###################################################
@@ -465,7 +464,7 @@ for (v in 1:N_vir) {
       n_shared_amgs <- n_shared_amgs + 1
     } else {
       # Overtake effect: strong boost
-      amg_weight <- runif(1, min = 0.5 * consumption_weight,
+      amg_weight <- runif(1, min = 0.8 * consumption_weight,
                               max = 2.0 * consumption_weight)
       n_overtake_amgs <- n_overtake_amgs + 1
     }
@@ -504,8 +503,8 @@ cat(sprintf("  Overtake effects (dominant): %d (%.1f%%)\n",
 # Key features:
 # - Selectivity-based: viruses are categorized into 3 selectivity classes
 # - Specialists: infect 1 host (highly selective)
-# - Moderate: infect 2-3 hosts (moderately selective)
-# - Generalists: infect 4-5 hosts (low selectivity)
+# - Moderate: infect 2-10 hosts (moderately selective)
+# - Generalists: infect 10-50 hosts (low selectivity)
 # - Multiple viruses can infect the same bacterium (realistic co-infection)
 # - Uniform random host selection (no cluster preferences)
 ################################################################################
@@ -528,8 +527,8 @@ virus_selectivity <- sample(1:n_selectivity_classes, N_vir, replace = TRUE,
 # Define number of hosts per selectivity class
 selectivity_host_ranges <- list(
   specialist = c(1, 1),      # Always 1 host
-  moderate = c(2, 10),        # 2-3 hosts
-  generalist = c(10,50)       # 4-5 hosts
+  moderate = c(2, 10),        # 2-10 hosts
+  generalist = c(10,50)       # 10-50 hosts
 )
 
 # Build infection matrix
@@ -635,17 +634,17 @@ cat(sprintf("  - Sparsity tracking enabled for B_comp and V_comp\n"))
 #
 # These matrices connect latent factors (Z) to metabolite abundances (Y):
 #
-# W1 = Cij %*% A1
+# W1 = -(Cij %*% A1_s)
 #      Maps bacteria-specific latent factors (Z1) to metabolites
-#      Captures bacteria-driven metabolite variance
+#      Captures bacteria-driven metabolite variance (negative = consumption)
 #
-# W2 = C_virus %*% Infection %*% A1
-#      Maps viral effects through infected bacteria to metabolites
-#      Represents AMG-enhanced metabolite consumption
+# W2 = -(C_virus %*% A2_s)
+#      Maps viral AMG effects to metabolites (negative = consumption)
+#      Infection matrix is kept as metadata, not used in W2 computation
 #
-# Ws = Cij %*% As_shared
+# Ws = random Gaussian matrix (N_met x dim_Zc)
 #      Maps shared latent factors (Zs) to metabolites
-#      Captures environmental/host factors affecting both bacteria and viruses
+#      Not derived mechanistically; captures shared variance directly
 #
 # Final metabolite model: Y = W1*Z1 + W2*Z2 + Ws*Zs + noise
 ################################################################################
@@ -703,7 +702,7 @@ Ws <- matrix(
  rnorm(N_met * dim_Zc, sd = 1),nrow = N_met,ncol = dim_Zc
 )
 
-cat(sprintf("Ws = Cij * Ac: %d x %d\n", nrow(Ws), ncol(Ws)))
+cat(sprintf("Ws = random Gaussian: %d x %d\n", nrow(Ws), ncol(Ws)))
 
 cat(sprintf("\n=== Weight Matrix Summary ===\n"))
 cat(sprintf("W1 (bacteria→metabolites): %d x %d\n", nrow(W1), ncol(W1)))
@@ -729,7 +728,7 @@ cat(sprintf("W2 row norms: mean=%.6f, range=[%.6f, %.6f]\n",
 ###################################################################
 # SUMMARY: We have now defined the mechanistic relationships
 # - WHICH metabolites are affected (metabolite groups)
-# - WHAT bacteria/viruses affect them (through C_bac and C_amg)
+# - WHAT bacteria/viruses affect them (through Cij and C_virus)
 # - HOW they are affected (through weight matrices W1, W2, Ws)
 # - HOW MUCH they are affected (magnitude of weights)
 # - WITH WHOM they interact (latent factors Z1, Z2, Zs)
@@ -1053,7 +1052,7 @@ total_var <- signal_var + noise_var
 # Since Var(Z) = 1 for all latents (sampled from N(0,1)):
 # Var(Y_i) = ||W1[i,:]||² + ||W2[i,:]||² + ||Ws[i,:]||² + noise_var[i]
 #
-# This matches the data generation exactly (lines 997-998)
+# This matches the data generation in the simulation loop (Y_log line)
 # ============================================================================
 
 gt_shares <- list(
@@ -1759,12 +1758,12 @@ cat("\n=== BUILDING FINAL OUTPUT DATA FRAMES ===\n")
 sim_ids <- 1:n_sims
 rep_ids <- rep(1L, n_sims)
 
-# Build final data frames with CLR-transformed data
-# Y_mat is still in log space (metabolites)
-# X1_mat and X2_mat are now CLR-transformed (D dimensions, but sum-to-zero constraint)
+# Build final data frames with relative abundance data
+# Y_mat is in log space (metabolites)
+# X1_mat and X2_mat are relative abundances (from multinomial sampling)
 Y_df  <- data.frame(sim = sim_ids, rep = rep_ids, Y_mat)
-X1_df <- data.frame(sim = sim_ids, rep = rep_ids, X1_mat)  # CLR-transformed bacteria
-X2_df <- data.frame(sim = sim_ids, rep = rep_ids, X2_mat)  # CLR-transformed viruses
+X1_df <- data.frame(sim = sim_ids, rep = rep_ids, X1_mat)  # Relative abundance bacteria
+X2_df <- data.frame(sim = sim_ids, rep = rep_ids, X2_mat)  # Relative abundance viruses
 
 # Set appropriate column names
 colnames(Y_df)[-(1:2)]  <- paste0("met_", 1:ncol(Y_mat))
@@ -1772,8 +1771,8 @@ colnames(X1_df)[-(1:2)] <- paste0("cbac_", 1:ncol(X1_mat))
 colnames(X2_df)[-(1:2)] <- paste0("vir_", 1:ncol(X2_mat))
 
 cat(sprintf("Y_df: %d samples x %d metabolites\n", nrow(Y_df), ncol(Y_df) - 2))
-cat(sprintf("X1_df: %d samples x %d CLR coordinates (bacteria)\n", nrow(X1_df), ncol(X1_df) - 2))
-cat(sprintf("X2_df: %d samples x %d CLR coordinates (viruses)\n", nrow(X2_df), ncol(X2_df) - 2))
+cat(sprintf("X1_df: %d samples x %d features (bacteria, relative abundance)\n", nrow(X1_df), ncol(X1_df) - 2))
+cat(sprintf("X2_df: %d samples x %d features (viruses, relative abundance)\n", nrow(X2_df), ncol(X2_df) - 2))
 
 write.csv(Y_df,  file = "Y_metabolites_log_synthetic_complex_sparse.csv", row.names = FALSE)
 write.csv(X1_df, file = "X1_bacteria_synthetic_RA_complex_sparse.csv",  row.names = FALSE)
