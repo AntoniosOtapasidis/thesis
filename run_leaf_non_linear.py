@@ -545,7 +545,7 @@ def main():
         )
 
 
-        # 1) index by sim
+        # Index by sim
         df_X1 = df_X1.set_index("sim")
         df_X2 = df_X2.set_index("sim")
         df_Y  = df_Y.set_index("sim")
@@ -561,7 +561,7 @@ def main():
         df_X2 = df_X2.loc[common_idx]
         df_Y  = df_Y.loc[common_idx]
 
-        # 2) drop 'rep', get numpy
+        # Drop 'rep', get numpy
         df_X1_feats = df_X1.drop(columns=["rep"])
         df_X2_feats = df_X2.drop(columns=["rep"])
         df_Y_feats  = df_Y.drop(columns=["rep"])
@@ -578,7 +578,7 @@ def main():
         dim_Y  = Y_np.shape[1]
         Y = Y_np
 
-        # 3) load GT variance shares from R
+        # load GT variance shares from R
         df_gt = pd.read_csv(
             os.path.join(_data_dir, "GT_virome_variance_shares_complex.csv")
         )
@@ -604,7 +604,6 @@ def main():
 
         gt = {"shares": shares}
 
-        # 4) data and targets for your model (unchanged)
         #data = np.stack([X1_np, X2_np], axis=0)  # (2, N, dim)
         X1_np= X1_np.astype(np.float32)
         X2_np= X2_np.astype(np.float32)
@@ -667,7 +666,7 @@ def main():
         )
 
 
-        # 1) index by sim
+        # Index by sim
         df_X1 = df_X1.set_index("sim")
         df_X2 = df_X2.set_index("sim")
         df_Y  = df_Y.set_index("sim")
@@ -683,7 +682,7 @@ def main():
         df_X2 = df_X2.loc[common_idx]
         df_Y  = df_Y.loc[common_idx]
 
-        # 2) drop 'rep', get numpy
+        # Drop 'rep', get numpy
         df_X1_feats = df_X1.drop(columns=["rep"])
         df_X2_feats = df_X2.drop(columns=["rep"])
         df_Y_feats  = df_Y.drop(columns=["rep"])
@@ -700,7 +699,7 @@ def main():
         dim_Y  = Y_np.shape[1]
         Y = Y_np
 
-        # 3) load GT variance shares from R
+        # Load GT variance shares from R
         df_gt = pd.read_csv(
             "R/synthetic_generation/GT_virome_variance_shares_complex_COPSAC.csv"
         )
@@ -726,7 +725,6 @@ def main():
 
         gt = {"shares": shares}
 
-        # 4) data and targets for your model (unchanged)
         #data = np.stack([X1_np, X2_np], axis=0)  # (2, N, dim)
         X1_np= X1_np.astype(np.float32)
         X2_np= X2_np.astype(np.float32)
@@ -789,7 +787,7 @@ def main():
         )
 
 
-        # 1) index by sim
+        # Index by sim
         df_X1 = df_X1.set_index("sim")
         df_X2 = df_X2.set_index("sim")
         df_Y  = df_Y.set_index("sim")
@@ -805,7 +803,7 @@ def main():
         df_X2 = df_X2.loc[common_idx]
         df_Y  = df_Y.loc[common_idx]
 
-        # 2) drop 'rep', get numpy
+        # Drop 'rep', get numpy
         df_X1_feats = df_X1.drop(columns=["rep"])
         df_X2_feats = df_X2.drop(columns=["rep"])
         df_Y_feats  = df_Y.drop(columns=["rep"])
@@ -819,7 +817,6 @@ def main():
         dim_Y  = Y_np.shape[1]
         Y = Y_np
 
-        # 3) load GT variance shares from R
         df_gt = pd.read_csv(
             "R/synthetic_generation/GT_virome_variance_shares_complex_COPSAC.csv"
         )
@@ -845,7 +842,6 @@ def main():
 
         gt = {"shares": shares}
 
-        # 4) data and targets for your model (unchanged)
         #data = np.stack([X1_np, X2_np], axis=0)  # (2, N, dim)
         X1_np= X1_np.astype(np.float32)
         X2_np= X2_np.astype(np.float32)
@@ -900,7 +896,7 @@ def main():
         #Load the data
         
         print("Loading the data...")
-        # --- 1.1  Load CSVs (or any other source)
+        # --- 1.1  Load CSVs 
         def _read_clean(path):
             df = pd.read_csv(path, sep='\t', index_col=0)
             # normalize index to comparable strings
@@ -971,7 +967,7 @@ def main():
         wandb.config.update({
                     "seed": args.seed,
                     "model_name": MODEL_NAME,
-                    "dims": args.dim_info # Now you can safely pass the dictionary
+                    "dims": args.dim_info 
                 }, allow_val_change=True)
 
 
@@ -1076,7 +1072,7 @@ def main():
         # 'data' here is the stacked numpy array with samples in columns
     #    num_data = data.shape[1]  # same as data.shape[1]
 
-        # 1) Pick train/test indices 
+        # Pick train/test indices
         train_tmp, test_tmp = torch.utils.data.random_split(
             tmp_dataset,
             [int(0.8 * num_data), num_data - int(0.8 * num_data)],
@@ -1106,7 +1102,7 @@ def main():
         X2_full = (X2_full - X2_mean) / X2_std
         X2_full = X2_full.astype(np.float32)
 
-        # THIS IS FOR THE MULTIMODAL DATASET
+        # Multimodal dataset
         # # Rebuild data with standardized CLR inputs
         # data = np.stack(
         #     [X1_full.astype(np.float32), X2_full.astype(np.float32)],
@@ -1119,7 +1115,7 @@ def main():
         # right after MODEL_NAME is constructed and before Y_full = np.load(...)
         np.save(f"data/disentangled/all_targets_{MODEL_NAME}.npy", Y_np)
 
-        # 2) Load and normalize Y using train indices only
+        # Load and normalize Y using train indices only
         # AFTER:
         Y_full = np.load(f"data/disentangled/all_targets_{MODEL_NAME}.npy").astype(np.float32)
 
@@ -1142,12 +1138,12 @@ def main():
         np.save(f"data/disentangled/targets_log_{MODEL_NAME}_train.npy", Y_final[indices])
         np.save(f"data/disentangled/targets_log_{MODEL_NAME}_test.npy",  Y_final[test_idx])
 
-        # 3) Build the REAL dataset with normalized Y as single label block
+        # Build the dataset with normalized Y as single label block
         #dataset = MultimodalDataset(data, targets1, targets2, targets3)
         dataset = MultiomicDataset(total_data=modalities, total_labels1=Y_final)
 
 
-        # 4) Now create subsets from THIS dataset
+        # Create subsets (train, val, test)
         from torch.utils.data import Subset, DataLoader
 
         train_dataset = Subset(dataset, indices.tolist())
@@ -1159,9 +1155,7 @@ def main():
 
 
 
-######################################################################## 
-########################Synthetic Data Modeling ########################
-########################################################################
+
 
 
     train_loader = DataLoader(
@@ -1185,7 +1179,7 @@ def main():
     #     print(f"Target (Y_matrix) shape : {Y_final.shape}")
 
 
-    # 5) Train models — these now see log-standardized Y via the dataset
+    # Train models
     train_mp(args.beta, train_loader, test_loader, train_dataset, test_dataset, args)
 
     print("CALLING train_step2", flush=True)
@@ -1193,7 +1187,7 @@ def main():
     print("RETURNED from train_step2", flush=True)
 
 
-    # 6) Gather embeddings (unchanged)
+    # Gather embeddings
     zs1_tr, zs2_tr, zc1_tr, zc2_tr = gather_embeddings(disen, train_loader, device=device)
     zs1_te, zs2_te, zc1_te, zc2_te = gather_embeddings(disen, test_loader, device=device)
     np.save(f'data/disentangled/zs1_{MODEL_NAME}.npy', zs1_tr)
@@ -1210,7 +1204,7 @@ def main():
 
 
 
-    # 7) For the variance-explained CVAE, directly use the same processed Y (avoid reloading originals)
+    # For the variance-explained CVAE, directly use the same processed Y (avoid reloading originals)
     Y_final = np.load(f"data/disentangled/all_targets_log_{MODEL_NAME}.npy").astype(np.float32)
     Y_train = torch.from_numpy(Y_final[indices]).float().to(device)
     Y_test  = torch.from_numpy(Y_final[test_idx]).float().to(device)
@@ -1257,7 +1251,7 @@ def main():
     hidden_dim = 50  # Reduced from 200 to prevent overfitting
     #z_dim = zs1.shape[1]
     n_covariates = 2
-    num_samples = 177  # This is just dataset size, not grid size
+    num_samples = 177  # dataset size
 
     z_dim_zs1 = zs1.shape[1]
     z_dim_zs2 = zs2.shape[1]
@@ -1297,7 +1291,7 @@ def main():
         cEncoder(z_dim=z_dim_zc1, mapping=nn.Sequential())   # for zc1
     ])
 
-# --- unchanged logic, but now explicit about input dims for each decoder_c ---
+# Input dims for each decoder_c
     decoders_c = [nn.Sequential(
         nn.Linear(x.shape[1], hidden_dim),
         nn.Tanh(),
@@ -1345,13 +1339,13 @@ def main():
         zs1_test.to(device), confounders_te, Y_error=Y_error_te.to(device), divide_by_total_var=False
     ).cpu()
 
-    # --- Overfitting check (add this right after varexp_te) ---
-    # 1) Reconstruction error gap
+    # Overfitting check
+    # Reconstruction error gap
     train_mse = (Y_error_tr ** 2).mean().item()
     test_mse  = (Y_error_te ** 2).mean().item()
     print(f"Reconstruction MSE  train={train_mse:.4f}  test={test_mse:.4f}")
 
-    # 2) Variance explained gap
+    # Variance explained gap
     # If varexp_* is a tensor per-feature, summarise it
     train_varexp_mean = varexp_tr.mean().item()
     test_varexp_mean  = varexp_te.mean().item()
@@ -1467,26 +1461,21 @@ def main():
         for j in range(n_outcomes):
             X = np.column_stack([f_z1[:, j], f_zs2[:, j], f_zc1[:, j]])  # (N,3)
 
-            # covariance is always well-defined (centers internally)
             cov = np.cov(X.T, ddof=0)
             cov_mats.append(cov)
 
-            # NaN-safe correlation: if any component variance is 0, skip corr for this outcome
             vars_ = np.diag(cov)
             if np.all(vars_ > 0):
                 corr = cov / np.sqrt(np.outer(vars_, vars_))
                 corr_mats.append(corr)
 
-            # cross-covariance term in Var(sum)
             cov_term = 2.0 * (cov[0, 1] + cov[0, 2] + cov[1, 2])
 
-            # normalize by Var(Yhat_j)
             yhat_j = X.sum(axis=1)
             var_yhat = np.var(yhat_j, ddof=0)
             if var_yhat > 0:
                 cov_share_var_yhat.append(cov_term / var_yhat)
 
-            # optional: normalize by Var(Y_j)
             if Y_in is not None:
                 yj = Y_in[:, j].detach().cpu().numpy()
                 var_y = np.var(yj, ddof=0)
@@ -1495,7 +1484,6 @@ def main():
 
         avg_cov = np.mean(cov_mats, axis=0)
 
-        # If corr_mats is empty (all outcomes degenerate), return NaNs
         if len(corr_mats) > 0:
             avg_corr = np.mean(corr_mats, axis=0)
         else:

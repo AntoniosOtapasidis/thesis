@@ -235,7 +235,6 @@ def make_mnist_gt(Y_like, add_style_target, w1, ws, wc, sigma_y,
         "noise": np.zeros(dim_y, dtype=np.float32),
     }
 
-    # Digits (deterministic assignments)
     shares["Z1"][0] = 1.0  # digit of image 1
     shares["Z2"][1] = 1.0  # digit of image 2
 
@@ -389,7 +388,7 @@ def main():
         )
 
 
-        # 1) index by sim
+        # Index by sim
         df_X1 = df_X1.set_index("sim")
         df_X2 = df_X2.set_index("sim")
         df_Y  = df_Y.set_index("sim")
@@ -422,7 +421,7 @@ def main():
         C = df_C[c_cols].to_numpy(dtype=np.float32)  # (N, dim_C)
         c = C  # alias for residualization (same as C now)
 
-        # 2) drop 'rep', get numpy
+        # Drop 'rep', get numpy
         df_X1_feats = df_X1.drop(columns=["rep"])
         df_X2_feats = df_X2.drop(columns=["rep"])
         df_Y_feats  = df_Y.drop(columns=["rep"])
@@ -439,7 +438,7 @@ def main():
         dim_Y  = Y_np.shape[1]
         Y = Y_np
 
-        # 3) load GT variance shares from R
+        # Load GT variance shares from R
         df_gt = pd.read_csv(
             os.path.join(_conf_dir, "GT_virome_variance_shares_complex_sparse_confounders.csv")
         )
@@ -478,7 +477,7 @@ def main():
 
         print("GT shares keys:", list(gt["shares"].keys()))
 
-        # 4) data and targets for your model (unchanged)
+        # Data and targets
         #data = np.stack([X1_np, X2_np], axis=0)  # (2, N, dim)
         X1_np= X1_np.astype(np.float32)
         X2_np= X2_np.astype(np.float32)
@@ -584,7 +583,6 @@ def main():
         # 'data' here is the stacked numpy array with samples in columns
     #    num_data = data.shape[1]  # same as data.shape[1]
 
-        # 1) Pick train/test indices 
         train_tmp, test_tmp = torch.utils.data.random_split(
             tmp_dataset,
             [int(0.8 * num_data), num_data - int(0.8 * num_data)],
@@ -606,7 +604,7 @@ def main():
 
         X1_full = X1_np.copy()
         X2_full = X2_np.copy()
-        # === Standardize CLR features for X1 and X2 using train indices only ===
+        # Standardize CLR features for X1 and X2 using train indices only
         X1_full = modalities_raw[0]  # [N, dim_X1], CLR already
         X2_full = modalities_raw[1]  # [N, dim_X2], CLR already
 
@@ -636,8 +634,7 @@ def main():
         # right after MODEL_NAME is constructed and before Y_full = np.load(...)
         np.save(f"data/disentangled/all_targets_{MODEL_NAME}.npy", Y_np)
 
-        # 2) Load and normalize Y using train indices only
-        # AFTER:
+        # Load and normalize Y using train indices only
         Y_full = np.load(f"data/disentangled/all_targets_{MODEL_NAME}.npy").astype(np.float32)
 
         # Only log-transform real COPSAC (raw metabolite concentrations)
@@ -654,17 +651,16 @@ def main():
         Y_final = (Y_log - Y_mean) / Y_std  # shape [num_samples, num_targets]
 
 
-        # Optional saves
         np.save(f"data/disentangled/all_targets_log_{MODEL_NAME}.npy", Y_final)
         np.save(f"data/disentangled/targets_log_{MODEL_NAME}_train.npy", Y_final[indices])
         np.save(f"data/disentangled/targets_log_{MODEL_NAME}_test.npy",  Y_final[test_idx])
 
-        # 3) Build the REAL dataset with normalized Y as single label block
+        # Build dataset with normalized Y as single label block
         #dataset = MultimodalDataset(data, targets1, targets2, targets3)
         dataset = MultiomicDataset(total_data=modalities, total_labels1=Y_final)
 
 
-        # 4) Now create subsets from THIS dataset
+        # Create train/test subsets
         from torch.utils.data import Subset, DataLoader
 
         train_dataset = Subset(dataset, indices.tolist())
@@ -742,10 +738,9 @@ def main():
 
 
 
-    K = 1000  # Much larger grid for better marginalization
+    K = 1000  
 
     def rand_grid_prior(dim, K):
-        # Sample from standard normal prior (no training data dependency)
         return torch.randn(K, dim, device=device).detach()
 
     grid_z = rand_grid_prior(zs1_tr.shape[1], K)
@@ -828,7 +823,7 @@ def main():
     print("LEAF SSE-R2 test mean:", r2_test_mean)
     print("LEAF SSE-R2 test median per-met:", float(np.median(r2_test_per_met)))
 
-    # variance-based R2 (matches your variance decomposition idea)
+    # Variance-based R2
     Vy = np.var(Y_test_np, axis=0, ddof=0)
     Vres = np.var(Y_test_np - Y_pred_te_np, axis=0, ddof=0)
     eps = 1e-12

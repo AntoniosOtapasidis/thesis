@@ -565,17 +565,8 @@ def main():
     config = wandb.config
 
 
-#Synthetic microbiome
-    #the first step would be to model the microbiome synthetic data and use random data for the viruses not associated with the 
-    #metbolites and see the level of disentanglement we can achieve
 
 
-    #The question that we aim to answer with the qt is to find who interacts with whom in terms of microbiome and virome
-    # Ground truth “who affects Y” comes from Cij
-    #bacterium j affects metabolite i if Cij[i, j] ≠ 0
-    #the strength/sign is in the magnitude and sign of Cij[i, j]
-    #Viruses have no interaction with Y at all:
-    #So their effective “Y weight” is exactly zero for every virus
 
     if args.dataset == "COPSAC_clone":
         df_X1 = pd.read_csv(
@@ -589,7 +580,7 @@ def main():
         )
 
 
-        # 1) index by 
+        # Index by sim
         df_X1 = df_X1.set_index("sim")
         df_X2 = df_X2.set_index("sim")
         df_Y  = df_Y.set_index("sim")
@@ -605,7 +596,7 @@ def main():
         df_X2 = df_X2.loc[common_idx]
         df_Y  = df_Y.loc[common_idx]
 
-        # 2) drop 'rep', get numpy
+        # Drop 'rep', get numpy
         df_X1_feats = df_X1.drop(columns=["rep"])
         df_X2_feats = df_X2.drop(columns=["rep"])
         df_Y_feats  = df_Y.drop(columns=["rep"])
@@ -622,7 +613,7 @@ def main():
         dim_Y  = Y_np.shape[1]
         Y = Y_np
 
-        # 3) load GT variance shares from R
+        # Load GT variance shares from R
         df_gt = pd.read_csv(
             "/users/antonios/LEAF_revisit/LEAF/COPSAC_clone/GT_virome_variance_shares_complex.csv"
         )
@@ -648,7 +639,6 @@ def main():
 
         gt = {"shares": shares}
 
-        # 4) data and targets for your model (unchanged)
         #data = np.stack([X1_np, X2_np], axis=0)  # (2, N, dim)
         X1_np= X1_np.astype(np.float32)
         X2_np= X2_np.astype(np.float32)
@@ -711,7 +701,7 @@ def main():
         )
 
 
-        # 1) index by sim
+        # Index by sim
         df_X1 = df_X1.set_index("sim")
         df_X2 = df_X2.set_index("sim")
         df_Y  = df_Y.set_index("sim")
@@ -727,7 +717,7 @@ def main():
         df_X2 = df_X2.loc[common_idx]
         df_Y  = df_Y.loc[common_idx]
 
-        # 2) drop 'rep', get numpy
+        # Drop 'rep', get numpy
         df_X1_feats = df_X1.drop(columns=["rep"])
         df_X2_feats = df_X2.drop(columns=["rep"])
         df_Y_feats  = df_Y.drop(columns=["rep"])
@@ -744,7 +734,7 @@ def main():
         dim_Y  = Y_np.shape[1]
         Y = Y_np
 
-        # 3) load GT variance shares from R
+        # load GT variance shares from R
         df_gt = pd.read_csv(
             "/users/antonios/LEAF_revisit/synthetic_microbiome/Bayesian-inference-of-bacteria-metabolite-interactions/GT_virome_variance_shares_final_COPSAC.csv"
         )
@@ -770,7 +760,6 @@ def main():
 
         gt = {"shares": shares}
 
-        # 4) data and targets for your model (unchanged)
         #data = np.stack([X1_np, X2_np], axis=0)  # (2, N, dim)
         X1_np= X1_np.astype(np.float32)
         X2_np= X2_np.astype(np.float32)
@@ -833,7 +822,7 @@ def main():
         )
 
 
-        # 1) index by sim
+        # index by sim
         df_X1 = df_X1.set_index("sim")
         df_X2 = df_X2.set_index("sim")
         df_Y  = df_Y.set_index("sim")
@@ -849,7 +838,7 @@ def main():
         df_X2 = df_X2.loc[common_idx]
         df_Y  = df_Y.loc[common_idx]
 
-        # 2) drop 'rep', get numpy
+        # drop 'rep', get numpy
         df_X1_feats = df_X1.drop(columns=["rep"])
         df_X2_feats = df_X2.drop(columns=["rep"])
         df_Y_feats  = df_Y.drop(columns=["rep"])
@@ -863,7 +852,7 @@ def main():
         dim_Y  = Y_np.shape[1]
         Y = Y_np
 
-        # 3) load GT variance shares from R
+        #  load GT variance shares from R
         df_gt = pd.read_csv(
             "/users/antonios/LEAF_revisit/synthetic_microbiome/Bayesian-inference-of-bacteria-metabolite-interactions/clr_seeds_sparse/GT_virome_variance_shares_complex_sparse.csv"
         )
@@ -889,7 +878,6 @@ def main():
 
         gt = {"shares": shares}
 
-        # 4) data and targets for your model (unchanged)
         #data = np.stack([X1_np, X2_np], axis=0)  # (2, N, dim)
         X1_np= X1_np.astype(np.float32)
         X2_np= X2_np.astype(np.float32)
@@ -944,7 +932,7 @@ def main():
         #Load the data
         
         print("Loading the data...")
-        # --- 1.1  Load CSVs (or any other source)
+
         def _read_clean(path):
             df = pd.read_csv(path, sep="\t", index_col=0)
             df.index = df.index.astype(str).str.strip()
@@ -1204,7 +1192,7 @@ def main():
         # right after MODEL_NAME is constructed and before Y_full = np.load(...)
         np.save(f"data/disentangled/all_targets_{MODEL_NAME}.npy", Y_np)
 
-        # 2) Load and normalize Y using train indices only
+        #  Load and normalize Y using train indices only
         # AFTER:
         Y_full = np.load(f"data/disentangled/all_targets_{MODEL_NAME}.npy").astype(np.float32)
         Y_full = Y_np.astype(np.float32, copy=False)
@@ -1223,18 +1211,17 @@ def main():
         Y_final = (Y_log - Y_mean) / Y_std  # shape [num_samples, num_targets]
 
 
-        # Optional saves
         np.save(f"data/disentangled/all_targets_log_{MODEL_NAME}.npy", Y_final)
         np.save(f"data/disentangled/targets_log_{MODEL_NAME}_train.npy", Y_final[train_indices])
         np.save(f"data/disentangled/targets_log_{MODEL_NAME}_val.npy", Y_final[val_indices])
         #np.save(f"data/disentangled/targets_log_{MODEL_NAME}_test.npy",  Y_final[test_idx])
 
-        # 3) Build the REAL dataset with normalized Y as single label block
+        # Build the dataset with normalized Y as single label block
         #dataset = MultimodalDataset(data, targets1, targets2, targets3)
         dataset = MultiomicDataset(total_data=modalities, total_labels1=Y_final)
 
 
-        # 4) Now create subsets from THIS dataset (train, val, test)
+        # Create subsets (train, val, test)
 
         train_dataset = Subset(dataset, train_indices.tolist())
         val_dataset   = Subset(dataset, val_indices.tolist())
@@ -1269,7 +1256,7 @@ def main():
         test_dataset, shuffle=False, drop_last=False, batch_size=args.batch_size
     )
 
-    # 5) Train models — these now see log-standardized Y via the dataset
+    # Train models
     train_mp(args.beta, train_loader, val_loader, train_dataset, val_dataset, args)  # val used as eval
 
     print("CALLING train_step2", flush=True)
@@ -1277,7 +1264,7 @@ def main():
     print("RETURNED from train_step2", flush=True)
 
 
-    # 6) Gather embeddings (unchanged)
+    # Gather embeddings
     zs1_tr, zs2_tr, zc1_tr, zc2_tr = gather_embeddings(disen, train_loader_noshuf, device=device)
     zs1_val, zs2_val, zc1_val, zc2_val = gather_embeddings(disen, val_loader, device=device)
     zs1_te, zs2_te, zc1_te, zc2_te = gather_embeddings(disen, test_loader, device=device)
@@ -1497,14 +1484,13 @@ def main():
     hsic_df.to_csv(hsic_csv_path, index=False)
     print(f"\n  HSIC metrics saved to: {hsic_csv_path}")
 
-    # Summary
     print("\n" + "-"*70)
     print("  INTERPRETATION GUIDE:")
     print("  - If 'At noise floor': Independence achieved, no need to increase hsic_weight")
     print("  - If 'SIGNIFICANT': Dependence still detectable, may benefit from higher hsic_weight")
     print("  - Effect size > 2: Strong dependence | 1-2: Moderate | < 1: Weak")
     print("="*70 + "\n")
-    # 7) For the variance-explained CVAE, directly use the same processed Y (avoid reloading originals)
+    # For the variance-explained CVAE, directly use the same processed Y (avoid reloading originals)
     Y_final = np.load(f"data/disentangled/all_targets_log_{MODEL_NAME}.npy").astype(np.float32)
     #c_train = torch.from_numpy(train_confounder).float().to(device)
     #c_test  = torch.from_numpy(test_confounder).float().to(device)
@@ -1718,7 +1704,6 @@ def main():
         return grid.detach()
 
 
-    # --- replace your uniform grids with empirical ones ---
 
     K = 1000  # or whatever you already use
 
@@ -1730,7 +1715,7 @@ def main():
     ]
 
 
-    # --- optional diagnostics (same style as yours) ---
+    # --- diagnostics ---
     print("\n=== Empirical Grid Diagnostics ===")
     print(f"grid_z range: [{grid_z.min().item():.3f}, {grid_z.max().item():.3f}]")
     print(f"zs1_tr range: [{zs1_tr.min().item():.3f}, {zs1_tr.max().item():.3f}]")
@@ -1771,7 +1756,6 @@ def main():
         cEncoder(z_dim=z_dim_zc1, mapping=nn.Sequential())   # for zc1
     ])
 
-# --- unchanged logic, but now explicit about input dims for each decoder_c ---
     decoders_c = [nn.Sequential(
         nn.Linear(x.shape[1], hidden_dim),
         nn.Tanh(),
@@ -1890,7 +1874,7 @@ def main():
         print("="*70)
 
     # ====================================================================
-    # COMPREHENSIVE DIAGNOSTICS
+    # DIAGNOSTICS
     # ====================================================================
     print("\n" + "="*70)
     print("COMPREHENSIVE POST-TRAINING DIAGNOSTICS")
@@ -1898,7 +1882,7 @@ def main():
 
     decoder.eval()
 
-    # 1. Check latent INPUT correlations (should be near zero from upstream encoder)
+    # Check latent INPUT correlations (should be near zero from upstream encoder)
     print("\n### 1. LATENT INPUT CORRELATIONS (from upstream encoder) ###")
     def compute_corr_matrix(tensors, names):
         """Compute correlation matrix between multiple tensors"""
@@ -1916,7 +1900,7 @@ def main():
         ["zs1", "zs2", "zc1"]
     )
 
-    # 2. Check decoder OUTPUT correlations (should be near zero for identifiability)
+    # Check decoder OUTPUT correlations (should be near zero for identifiability)
     print("\n### 2. DECODER OUTPUT CORRELATIONS ###")
     with torch.no_grad():
         f_z1 = decoder.forward_z(zs1_tr)
@@ -1929,7 +1913,7 @@ def main():
         ["f_z1", "f_z2", "f_zc"]
     )
 
-    # 3. Detailed per-metabolite correlations
+    # Detailed per-metabolite correlations
     print("\n### 3. PER-METABOLITE OUTPUT CORRELATIONS ###")
     with torch.no_grad():
         # Compute correlations for each metabolite separately
@@ -1954,7 +1938,7 @@ def main():
     print(f"  |corr(f_z1, f_zc)|: {np.mean(np.abs(corr_z1_zc_per_met)):.4f}")
     print(f"  |corr(f_z2, f_zc)|: {np.mean(np.abs(corr_z2_zc_per_met)):.4f}")
 
-    # 4. Check if decoder is learning meaningful functions
+    #  Check if decoder is learning meaningful functions
     print("\n### 4. DECODER OUTPUT STATISTICS ###")
     print(f"f_z1: mean={f_z1.mean():.4f}, std={f_z1.std():.4f}, "
           f"range=[{f_z1.min():.4f}, {f_z1.max():.4f}]")
@@ -1963,7 +1947,7 @@ def main():
     print(f"f_zc: mean={f_zc.mean():.4f}, std={f_zc.std():.4f}, "
           f"range=[{f_zc.min():.4f}, {f_zc.max():.4f}]")
 
-    # 5. Integral convergence
+    # Integral convergence
     print("\n### 5. INTEGRAL CONVERGENCE ###")
     int_z_final, int_c_final, int_cz_final = decoder.calculate_integrals_numpy()
     print(f"Final int_z_mean_abs: {np.abs(int_z_final).mean():.6f}")
@@ -1983,7 +1967,7 @@ def main():
     int_z_mean = np.abs(int_z_hist).mean(axis=(1, 2))
     int_c_mean = np.abs(int_c_hist).mean(axis=(1, 2))
 
-    # Nature-style plot settings
+    # plot settings
     plt.rcParams.update({
         'font.family': 'sans-serif',
         'font.sans-serif': ['Arial', 'Helvetica'],
@@ -2061,7 +2045,7 @@ def main():
     print("END OF DIAGNOSTICS")
     print("="*70 + "\n")
 
-        # ------------------------------------------------------------------
+    # ------------------------------------------------------------------
     # Switch to evaluation mode BEFORE computing errors / variance
     # ------------------------------------------------------------------
 
@@ -2317,26 +2301,21 @@ def main():
         for j in range(n_outcomes):
             X = np.column_stack([f_z1[:, j], f_zs2[:, j], f_zc1[:, j]])  # (N,3)
 
-            # covariance is always well-defined (centers internally)
             cov = np.cov(X.T, ddof=0)
             cov_mats.append(cov)
 
-            # NaN-safe correlation: if any component variance is 0, skip corr for this outcome
             vars_ = np.diag(cov)
             if np.all(vars_ > 0):
                 corr = cov / np.sqrt(np.outer(vars_, vars_))
                 corr_mats.append(corr)
 
-            # cross-covariance term in Var(sum)
             cov_term = 2.0 * (cov[0, 1] + cov[0, 2] + cov[1, 2])
 
-            # normalize by Var(Yhat_j)
             yhat_j = X.sum(axis=1)
             var_yhat = np.var(yhat_j, ddof=0)
             if var_yhat > 0:
                 cov_share_var_yhat.append(cov_term / var_yhat)
 
-            # optional: normalize by Var(Y_j)
             if Y_in is not None:
                 yj = Y_in[:, j].detach().cpu().numpy()
                 var_y = np.var(yj, ddof=0)
@@ -2345,7 +2324,6 @@ def main():
 
         avg_cov = np.mean(cov_mats, axis=0)
 
-        # If corr_mats is empty (all outcomes degenerate), return NaNs
         if len(corr_mats) > 0:
             avg_corr = np.mean(corr_mats, axis=0)
         else:
@@ -2441,7 +2419,6 @@ def main():
         print("\nVar(Y) summary:")
         print("  min:", np.nanmin(varY), "median:", np.nanmedian(varY), "mean:", np.nanmean(varY), "max:", np.nanmax(varY))
 
-    # # call it
     # debug_cov_share(decoder, zs1_te, zs2_te, zc1_te, Y_test, top_k=10)
 
     # # df_piv should have columns: outcome, component, train, val, test (depending on what you included)

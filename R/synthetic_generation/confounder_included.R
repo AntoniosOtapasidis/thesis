@@ -28,16 +28,7 @@ cat("All libraries loaded successfully\n")
 # - Viral community composition (via As2)
 # - Metabolite outcomes (via Ws, a random Gaussian weight matrix)
 #
-# Examples of factors captured by Zs:
-# - Environmental: pH, temperature, oxygen, nutrient availability
-# - Host-related: immune state, inflammation, diet, medication
-# - Technical: batch effects, sample processing, sequencing depth
-#
-# Key properties:
-# 1. Same Zs value affects both bacteria and viruses in each sample
-# 2. Creates correlation between X1 (bacteria) and X2 (viruses)
-# 3. Affects metabolites directly through Ws weight matrix
-#
+
 ################################################################################
 
 
@@ -54,12 +45,7 @@ cat("All libraries loaded successfully\n")
 #           - No X1×X2 interactions
 #           - Use this for main LEAF experiments
 #
-# "mechanistic": Y = f(X1, X2) + ε (FUTURE IMPLEMENTATION)
-#                - Y depends on observed abundances X1, X2
 
-#                - Direct X1×X2 interactions (viral AMG boost)
-#                - Tests LEAF robustness to non-additive effects
-#                - Currently not implemented (see ODE file for reference)
 ################################################################################
 Y_generation_mode <- "linear"  # Options: "linear", "mechanistic"
 
@@ -208,9 +194,7 @@ cat("\n=== COMPUTING WEIGHT MATRICES (W1, W2, Ws) FROM CONSUMPTION ===\n")
 
 
 ################################################################################
-# VIRUS-BACTERIA INFECTION MATRIX PROOF OF CONCEPT 1+1 BACTERIA VIRUS PAIRS
-################################################################################
-# Each viral species has 1 bacterial host of bacteria with varying strength
+# VIRUS-BACTERIA INFECTION MATRIX (1-to-1 pairs)
 ################################################################################
 # cat("\n=== CREATING VIRUS-BACTERIA INFECTION MATRIX ===\n")
 
@@ -230,7 +214,7 @@ cat("\n=== COMPUTING WEIGHT MATRICES (W1, W2, Ws) FROM CONSUMPTION ===\n")
 
 
 ################################################################################
-# VIRUS-BACTERIA INFECTION MATRIX PROOF OF CONCEPT 1 VIRUS 1 BACTERIA BUT 1 BACTERIA MULTIPLE PARACITES
+# VIRUS-BACTERIA INFECTION MATRIX (one-to-many: multiple viruses per host)
 ################################################################################
 
 # cat("\n=== CREATING VIRUS-BACTERIA INFECTION MATRIX COPSAC CLONE===\n")
@@ -319,9 +303,7 @@ Cij <- matrix(0, N_met, N_bac)
 consumption_weight  <- 0.1
 cat(sprintf("Base consumption rate (consumption_weight): %.6f\n", consumption_weight))
 
-# ===================================================================
-# STEP 1: Assign bacteria to 4 metabolic profile clusters
-# ===================================================================
+# Assign bacteria to 4 metabolic profile clusters
 n_metabolic_clusters <- 4
 bac_cluster <- sample(1:n_metabolic_clusters, N_bac, replace = TRUE)
 cat(sprintf("Assigned %d bacteria to %d metabolic clusters\n", N_bac, n_metabolic_clusters))
@@ -336,15 +318,11 @@ cluster_prefs <- list(
   cluster4 = list(B = 0.6, V = 0.5, S = 0.5)   # Balanced/generalist
 )
 
-# ===================================================================
-# STEP 2: met_N (91-100) = PURE NOISE (no bacterial interactions)
-# ===================================================================
+# met_N (91-100) = noise metabolites (no bacterial interactions)
 Cij[met_N, ] <- 0
 cat(sprintf("Set %d noise metabolites to ZERO bacterial interactions\n", length(met_N)))
 
-# ===================================================================
-# STEP 3: Build dense interactions for 90 signal metabolites
-# ===================================================================
+# Build dense interactions for 90 signal metabolites
 signal_metabolites <- c(met_B, met_V, met_S)  # 90 metabolites
 cat(sprintf("Building dense interactions for %d signal metabolites\n", length(signal_metabolites)))
 
@@ -454,19 +432,6 @@ cat(sprintf("AMG boost range: [%.6f, %.6f]\n", min_boost, max_boost))
 ################################################################################
 # VIRUS-METABOLITE INTERACTION MATRIX (C_virus / AMG EFFECTS)
 ################################################################################
-# ALGORITHM: Sparse AMG assignment
-#
-# C_virus[i, v] = AMG boost from virus v on metabolite i
-#
-# Process:
-# 1. Initialize C_virus matrix (N_met x N_vir) with zeros
-# 2. Ensure no AMG effects on bacteria-dominated metabolites (met_B) and noise metabolites (met_N)
-# 3. For each virus: assign 1-3 AMGs from eligible metabolites (met_V and met_S)
-# 4. Each AMG is randomly classified as shared (60%) or overtake (40%) effect
-#
-# Each virus targets 1-3 randomly sampled metabolites from the eligible set
-# with boost strengths drawn relative to consumption_weight
-################################################################################
 
 ###################################################
 # VIRUS-METABOLITE INTERACTION MATRIX (C_virus / AMG effects) - SPARSE
@@ -478,22 +443,16 @@ cat("\n=== BUILDING SPARSE VIRUS-METABOLITE (AMG) INTERACTION MATRIX (C_virus) =
 C_virus <- matrix(0, nrow = N_met, ncol = N_vir)
 cat(sprintf("Initialized C_virus matrix: %d x %d\n", nrow(C_virus), ncol(C_virus)))
 
-# ===================================================================
-# STEP 1: Define AMG effect types (shared vs overtake)
-# ===================================================================
+# Define AMG effect types (shared vs overtake)
 AMG_effect_type <- matrix("none", nrow = N_met, ncol = N_vir)
 
-# ===================================================================
-# STEP 2: No AMGs for met_B (bacteria-dominated) and met_N (noise)
-# ===================================================================
+# No AMGs for met_B (bacteria-dominated) and met_N (noise)
 C_virus[met_B, ] <- 0
 C_virus[met_N, ] <- 0
 cat(sprintf("Set C_virus to 0 for %d bacteria-dominated metabolites (met_B)\n", length(met_B)))
 cat(sprintf("Set C_virus to 0 for %d noise metabolites (met_N)\n", length(met_N)))
 
-# ===================================================================
-# STEP 3: Build sparse AMG interactions (simple)
-# ===================================================================
+# Build sparse AMG interactions
 amg_metabolites <- c(met_V, met_S)  # Only these 60 metabolites can have AMGs
 cat(sprintf("\nBuilding sparse AMG interactions from %d eligible metabolites\n", length(amg_metabolites)))
 
@@ -693,31 +652,10 @@ cat(sprintf("  - Sparsity tracking enabled for B_comp and V_comp\n"))
 ################################################################################
 # WEIGHT MATRICES CONSTRUCTION
 ################################################################################
-# ALGORITHM: Latent factor to metabolite mapping
-#
-# These matrices connect latent factors (Z) to metabolite abundances (Y):
-#
-# W1 = -(Cij %*% A1_s)
-#      Maps bacteria-specific latent factors (Z1) to metabolites
-#      Captures bacteria-driven metabolite variance
-#
-# W2 = -(C_virus %*% A2_s)
-#      Maps viral AMG effects to metabolites
-#      Represents AMG-enhanced metabolite consumption
-#
-# Ws = random Gaussian weight matrix
-#      Maps shared latent factors (Zs) to metabolites
-#      Captures environmental/host factors affecting both bacteria and viruses
-#
-# Final metabolite model: Y = W1*Z1 + W2*Z2 + Ws*Zs + noise
-################################################################################
 
-# ============================================================
-# WEIGHT MATRICES (W: map latent factors to metabolites) DEFINE THE LINEAR MAPPINGS, HOW THE LATENT FACTOS INTERACT WITH THE OUTCOMES
-# ======================================================== ====
 cat("\n=== COMPUTING WEIGHT MATRICES (Ws, W1, W2) ===\n")
 
-# What we have to do in this section is create linear mappings of the representations Z 
+# Linear mappings of Z to metabolites
 
 
 W1 <- -(Cij %*% A1_s)
@@ -739,13 +677,8 @@ cat(sprintf("\nComputing W2 from viral AMG effects:\n"))
 cat(sprintf("  C_virus: %d x %d (metabolite x virus)\n", nrow(C_virus), ncol(C_virus)))
 cat(sprintf("  A2_s: %d x %d (virus x Z2)\n", nrow(A2_s), ncol(A2_s)))
 
-## BIOLOGICAL MODEL:
-## - C_virus encodes viral AMG metabolic capabilities (which metabolites each virus affects)
-## - Viral metabolic effects scale with Z2 (viral abundance/activity in the community)
-## - The Infection matrix provides biological context (host range, specificity)
-##   but is kept as METADATA - it does not modify the AMG strength
-## - Rationale: AMG capability is intrinsic to the virus, not amplified by host range
-## - Host range affects ecological breadth, not per-virus metabolic strength
+## C_virus encodes viral AMG metabolic capabilities
+## Infection matrix is kept as metadata (does not modify AMG strength)
 
 # Direct viral AMG effect
 W2 <- -(C_virus %*% A2_s)
@@ -791,14 +724,7 @@ cat(sprintf("W2 row norms: mean=%.6f, range=[%.6f, %.6f]\n",
             min(sqrt(rowSums(W2^2))),
             max(sqrt(rowSums(W2^2)))))
 
-###################################################################
-# SUMMARY: We have now defined the mechanistic relationships
-# - WHICH metabolites are affected (metabolite groups)
-# - WHAT bacteria/viruses affect them (through Cij and C_virus)
-# - HOW they are affected (through weight matrices W1, W2, Ws)
-# - HOW MUCH they are affected (magnitude of weights)
-# - WITH WHOM they interact (latent factors Z1, Z2, Zs)
-###################################################################
+
 cat("Mechanistic structure fully defined\n")
 
 
@@ -1246,10 +1172,9 @@ softmax <- function(x) {
 ################################################################################
 # Following LEAF's approach: shallow MLP for nonlinear latent-to-observation mapping
 #
-# KEY INSIGHT: Both linear and nonlinear models output log-concentrations
-# - Linear: B_star = A·Z (additive in log-space)
-# - Nonlinear: B_star = MLP(Z) (nonlinear function in log-space)
-# - Both use softmax(B_star) to get compositional closure
+# Both linear and nonlinear models output log-concentrations
+# Linear: B_star = A*Z, Nonlinear: B_star = MLP(Z)
+# Both use softmax(B_star) for compositional closure
 #
 
 use_nonlinear_X <- FALSE 
@@ -1849,13 +1774,7 @@ cat("- Expected: All correlations should be ~0 since we sample independently\n")
 ################################################################################
 # METABOLITE CLASSIFICATION BY DOMINANT VARIANCE SOURCE
 ################################################################################
-# ALGORITHM: Classify metabolites based on empirical variance shares
-#
-# For each metabolite m:
-# - Compute which component (Z1, Z2, Zs, noise) has the highest share
-# - If max share >= dominance threshold (0.35), classify as that type
-# - Otherwise, classify as "mixed"
-#
+# Classify metabolites based on empirical variance shares
 # Classification labels:
 # - "Z1_dominant": Bacteria-driven
 # - "Z2_dominant": Virus-driven
@@ -2410,7 +2329,7 @@ write.csv(X2_df, file = "X2_viruses_synthetic_RA_complex_sparse_condounders.csv"
 # dir.create("validation_plots", showWarnings = FALSE, recursive = TRUE)
 
 # # X1_df and X2_df expected to have columns: sim, rep, and taxa columns
-# # If your objects are X1_mat/X2_mat matrices, convert to data.frame first:
+# # If X1_mat/X2_mat are matrices, convert to data.frame first:
 # # X1_df <- as.data.frame(X1_mat, check.names = FALSE)
 # # X2_df <- as.data.frame(X2_mat, check.names = FALSE)
 
