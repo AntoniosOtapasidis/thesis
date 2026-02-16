@@ -64,7 +64,11 @@ Train LEAF on synthetic data with CLR-transformed inputs:
 ```bash
 python run_leaf_non_linear.py --dataset microbiome_synthetic --beta 0.1 --iters_pred 5000
 ```
+Or with ILR-transformed inputs:
 
+```bash
+python run_leaf_non_linear.py --dataset COPSAC_clone --beta 0.1 --iters_pred 5000
+```
 Or with ILR-transformed inputs:
 
 ```bash
