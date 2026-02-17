@@ -71,7 +71,6 @@ sum(is.na(metabolites[[id_col]]))
 library(tidyverse)
 
 id_col <-"id"
-# 3) Move IDs to rownames in metabolites and drop the ID column
 metabolites2 <- as.data.frame(metabolites, check.names = FALSE)
 rownames(metabolites2) <- as.character(metabolites2[[id_col]])
 metabolites2[[id_col]] <- NULL
@@ -80,7 +79,7 @@ metabolites2[[id_col]] <- NULL
 
 ```{r}
 
-# 4) Ensure both objects are data.frames with IDs as rownames
+# Ensure both objects are data.frames with IDs as rownames
 bacteriome<- as.data.frame(bacteriome_T, check.names = FALSE)
 metabolites2  <- as.data.frame(metabolites2,  check.names = FALSE)
 
@@ -93,7 +92,7 @@ metabolites2  <- as.data.frame(metabolites2,  check.names = FALSE)
 ```
 
 ```{r}
-# 5) Keep only matching IDs and sort them identically
+# Keep only matching IDs and sort them identically
 common_ids <- intersect(rownames(bacteriome), rownames(metabolites2))
 
 if (length(common_ids) == 0) {

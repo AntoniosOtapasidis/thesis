@@ -34,8 +34,6 @@ taxonomy
 
 #check if the compositions are closed to 1 
 bacteriome_T <- as.data.frame(virome)
-# Suppose your dataframe is called df
-# base R
 #colnames(bacteriome_T) <- bacteriome_T[1, ]   # take first row as column names
 #bacteriome_T <- bacteriome_T[-1, ]            # remove the first row
                # Remove that first row
@@ -127,7 +125,7 @@ The virome dataset contained three viruses(rows) that were all 0s. I have to dro
 X <- data.matrix(bacteriome)      # converts non-numerics to NA if needed
 mode(X) <- "numeric"
 
-# 1) Columns (samples)
+#  Columns (samples)
 cols_all_na    <- colSums(is.na(X)) == nrow(X)
 cols_all_zero  <- !cols_all_na & colSums(replace(X, is.na(X), 0)) == 0
 
@@ -137,7 +135,7 @@ if (any(cols_all_na)) print(colnames(X)[cols_all_na]) else cat("None\n")
 cat("All-zero (or NA->0) columns (n=", sum(cols_all_zero), "):\n", sep="")
 if (any(cols_all_zero)) print(colnames(X)[cols_all_zero]) else cat("None\n")
 
-# 2) Rows (taxa)
+#  Rows (taxa)
 rows_all_na    <- rowSums(is.na(X)) == ncol(X)
 rows_all_zero  <- !rows_all_na & rowSums(replace(X, is.na(X), 0)) == 0
 
@@ -157,7 +155,6 @@ cat("Dropping", sum(rows_to_drop), "rows (taxa) with all NA or all zero values.\
 
 X_clean <- X[!rows_to_drop, , drop = FALSE]
 
-# Optional: also drop problematic columns if needed
 cols_to_drop <- cols_all_na | cols_all_zero
 cat("Dropping", sum(cols_to_drop), "columns (samples) with all NA or all zero values.\n")
 
@@ -179,7 +176,7 @@ cs <- colSums(X, na.rm = TRUE)
 #apply closure to 1
 X <- sweep(X, 2, ifelse(cs == 0, NA, cs), "/")
 
-# 2) zCompositions expects samples in ROWS -> transpose
+# zCompositions expects samples in ROWS -> transpose
 X_t <- t(X)
 
 X_t <-as.data.frame(X_t)
@@ -194,7 +191,7 @@ This function implements methods for imputing zeros in compositional count data 
 
 ```{r}
 
-# 3) Multiplicative replacement with CZM (δ = 0.65 × min positive when DL unknown)
+# Multiplicative replacement with CZM (δ = 0.65 × min positive when DL unknown)
 #    label=0 tells the function which entries are zeros
 
 X_rep_t <- cmultRepl(
@@ -213,7 +210,7 @@ X_rep_t <- cmultRepl(
 
 ```{r}
 
-# 4) Transpose back to taxa x samples and re-close columns (guard against numeric drift)
+# Transpose back to taxa x samples and re-close columns (guard against numeric drift)
 X_rep <- t(X_rep_t)
 X_rep <- sweep(X_rep, 2, colSums(X_rep), "/")
 

@@ -280,9 +280,8 @@ All effects are described as their deviation from the mean
 ```{r}
 metadata_processed <- read.table("metadata_processed.tsv", sep = "\t", header = TRUE)
 ###############################
-# 2) Make sure the matrix is numeric
+#  Make sure the matrix is numeric
 ###############################
-# Coerce all columns to numeric (error if non-numeric remains)
 X <- as.matrix(data.frame(lapply(metabolite_data, function(col) {
   if (is.numeric(col)) return(col)
   suppressWarnings(as.numeric(col))
@@ -354,10 +353,10 @@ factorial_size
 ```
 
 ```{r}
-## 1a. Keep only existing names
+##  Keep only existing names
 factors2 <- intersect(factors_subset, names(metadata_processed))
 
-## 1b. Inspect the length of each column
+##  Inspect the length of each column
 lens <- sapply(metadata_processed[factors_subset], length)
 lens
 ```
@@ -612,15 +611,15 @@ limpca::pcaScreePlot(resPCA1, nPC = 9)
 ```
 
 ```{r}
-# 1) Confirm the objects exist
+# Confirm the objects exist
 exists("lmpData")
 exists("lmpData_log")
 
-# 2) Confirm lmpData has the expected slots
+# Confirm lmpData has the expected slots
 names(lmpData)
 names(lmpData_log)
 
-# 3) Confirm outcomes is numeric matrix and dimensions look right
+# Confirm outcomes is numeric matrix and dimensions look right
 class(lmpData$outcomes)
 is.matrix(lmpData$outcomes)
 mode(lmpData$outcomes)
@@ -631,14 +630,14 @@ is.matrix(lmpData_log$outcomes)
 mode(lmpData_log$outcomes)
 dim(lmpData_log$outcomes)
 
-# 4) Confirm your log transform actually happened
+#  Confirm your log transform actually happened
 identical(lmpData$outcomes, lmpData_log$outcomes)   # should be FALSE
 
-# 5) Confirm there are no Inf/-Inf/NaN introduced
+# Confirm there are no Inf/-Inf/NaN introduced
 sum(!is.finite(lmpData_log$outcomes))
 range(lmpData_log$outcomes, finite = TRUE)
 
-# 6) Confirm you're calling the right PCA functions and result has expected fields
+#  Confirm you're calling the right PCA functions and result has expected fields
 resPCA1 <- limpca::pcaBySvd(lmpData_log$outcomes)
 class(resPCA1)
 names(resPCA1)
@@ -937,7 +936,6 @@ rename_map <- c(
   "All_forms_of_pain\nPC1" = "Pain PC1"
 )
 
-# Helper: normalize newline spacing so "...\n PC1" and "...\nPC1" match
 normalize_key <- function(z) {
   z %>%
     str_replace_all("\\s*\\n\\s*", "\n") %>%  # normalize spaces around newline

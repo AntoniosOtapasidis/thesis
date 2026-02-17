@@ -656,13 +656,13 @@ def main():
     
     elif args.dataset == "microbiome_synthetic":
         df_X1 = pd.read_csv(
-            "R/synthetic_generation/X1_bacteria_synthetic_CLR.csv"
+            "X1_bacteria_synthetic_CLR.csv"
         )
         df_X2 = pd.read_csv(
-            "R/synthetic_generation/X2_viruses_synthetic_CLR.csv"
+            "X2_viruses_synthetic_CLR.csv"
         )
         df_Y = pd.read_csv(
-            "R/synthetic_generation/Y_metabolites_log_synthetic_complex_RA_COPSAC.csv"
+            "Y_metabolites_log_synthetic_complex_RA_COPSAC.csv"
         )
 
 
@@ -701,7 +701,7 @@ def main():
 
         # Load GT variance shares from R
         df_gt = pd.read_csv(
-            "R/synthetic_generation/GT_virome_variance_shares_complex_COPSAC.csv"
+            "GT_virome_variance_shares_complex_COPSAC.csv"
         )
 
         # ensure metabolite ordering in GT matches Y columns
@@ -777,13 +777,13 @@ def main():
 
     elif args.dataset == "microbiome_synthetic_ilr":
         df_X1 = pd.read_csv(
-            "R/synthetic_generation/X1_bacteria_synthetic_ILR_final.csv"
+            "X1_bacteria_synthetic_ILR_final.csv"
         )
         df_X2 = pd.read_csv(
-            "R/synthetic_generation/X2_viruses_synthetic_ILR_final.csv"
+            "X2_viruses_synthetic_ILR_final.csv"
         )
         df_Y = pd.read_csv(
-            "R/synthetic_generation/Y_metabolites_log_synthetic_complex_RA_COPSAC.csv"
+            "Y_metabolites_log_synthetic_complex_RA_COPSAC.csv"
         )
 
 
@@ -818,7 +818,7 @@ def main():
         Y = Y_np
 
         df_gt = pd.read_csv(
-            "R/synthetic_generation/GT_virome_variance_shares_complex_COPSAC.csv"
+            "GT_virome_variance_shares_complex_COPSAC.csv"
         )
 
         # ensure metabolite ordering in GT matches Y columns

@@ -1625,7 +1625,7 @@ table(gt_df$group)
 gt_df <-gt_df %>%
   select(-group)
 
-write.csv(gt_df, "GT_virome_variance_shares_complex_sparse.csv", row.names = FALSE)
+write.csv(gt_df, "GT_virome_variance_shares_complex_COPSAC.csv", row.names = FALSE)
 
 
 Z1_df <- data.frame(sim = 1:n_sims, Z1_store)
@@ -1667,9 +1667,9 @@ cat(sprintf("Y_df: %d samples x %d metabolites\n", nrow(Y_df), ncol(Y_df) - 2))
 cat(sprintf("X1_df: %d samples x %d features (bacteria, relative abundance)\n", nrow(X1_df), ncol(X1_df) - 2))
 cat(sprintf("X2_df: %d samples x %d features (viruses, relative abundance)\n", nrow(X2_df), ncol(X2_df) - 2))
 
-write.csv(Y_df,  file = "Y_metabolites_log_synthetic_complex_sparse.csv", row.names = FALSE)
-write.csv(X1_df, file = "X1_bacteria_synthetic_RA_complex_sparse.csv",  row.names = FALSE)
-write.csv(X2_df, file = "X2_viruses_synthetic_RA_complex_sparse.csv",   row.names = FALSE)
+write.csv(Y_df,  file = "Y_metabolites_log_synthetic_complex_RA_COPSAC.csv", row.names = FALSE)
+write.csv(X1_df, file = "X1_bacteria_synthetic_RA_complex_COPSAC.csv",  row.names = FALSE)
+write.csv(X2_df, file = "X2_viruses_synthetic_RA_complex_COPSAC.csv",   row.names = FALSE)
 
 
 # ---------------------------
@@ -1772,7 +1772,7 @@ cat("    Saved to validation_plots/02_latent_correlations.png\n")
 cat("  Creating Plot 4: Metabolite intensity distributions...\n")
 
 # Read ground truth to get variance shares for coloring
-gt_temp <- read.csv("GT_virome_variance_shares_complex_sparse.csv")
+gt_temp <- read.csv("GT_virome_variance_shares_complex_COPSAC.csv")
 
 # Classify metabolites by dominant variance source
 dom_thr <- 0.35
