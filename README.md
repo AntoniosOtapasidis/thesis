@@ -83,5 +83,5 @@ Y = W1 * Z1 + W2 * Z2 + Ws * Zs + Wc * C + noise
 ```
 
 ```bash
-python leaf_synthetic.py --dataset microbiome_synthetic --beta 0.1 --iter_pred 5000 --iters_pred 10000 --iters_res 5000
+python leaf_synthetic.py --dataset microbiome_synthetic --beta 0.1 --iters_pred 10000 --iters_res 5000
 ```
