@@ -94,13 +94,14 @@ ilr_transform <- function(M, sbp, min_prevalence = 0.10) {
   # =================================================================
   if (any(M_filtered == 0)) {
     cat("  Applying multiplicative replacement for zeros...\n")
-    M_replaced <- zCompositions::cmultRepl(
-      M_filtered,
-      label = 0,
-      method = "CZM",
-      z.delete = FALSE,
-      z.warning = 0
-    )
+    M_replaced <- zCompositions::multRepl(
+    M_filtered,
+    label = 0,
+    dl = NULL,
+    frac = 0.65,
+    z.warning = 1,
+    z.delete = FALSE
+  )
     M_replaced <- as.matrix(M_replaced)
   } else {
     cat("  No zeros detected, skipping multiplicative replacement.\n")

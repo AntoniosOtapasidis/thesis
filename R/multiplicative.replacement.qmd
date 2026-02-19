@@ -194,14 +194,13 @@ This function implements methods for imputing zeros in compositional count data 
 # Multiplicative replacement with CZM (δ = 0.65 × min positive when DL unknown)
 #    label=0 tells the function which entries are zeros
 
-X_rep_t <- cmultRepl(
+X_rep_t2 <- multRepl(
   X_t,
   label = 0,
-  method = "CZM",
-  output = "prop",
-  z.warning = 1,      # effectively no warning threshold
-  z.delete  = FALSE,  # do NOT delete high-zero columns
-  suppress.print = TRUE
+  dl = NULL,
+  frac = 0.65,
+  z.warning = 1,
+  z.delete = FALSE
 )
 
 

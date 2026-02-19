@@ -9,7 +9,7 @@ X2_df0 <- read.csv(
   "X2_viruses_synthetic_RA_complex_COPSAC.csv",
   sep = ",", header = TRUE, check.names = FALSE
 )
-
+  
 library(compositions)
 library(zCompositions)
 library(caret)
@@ -104,12 +104,13 @@ clr_transform <- function(x, min_prevalence = 0.10) {
   # 4) Multiplicative replacement for zeros
   if (any(x == 0)) {
     cat(sprintf("  Found %d zeros, applying multiplicative replacement...\n", sum(x == 0)))
-    x <- zCompositions::cmultRepl(
+    x <- zCompositions::multRepl(
       x,
       label = 0,
-      method = "CZM",
-      z.delete = FALSE,
-      z.warning = 0
+      dl = NULL,
+      frac = 0.65,
+      z.warning = 1,
+      z.delete = FALSE
     )
   } else {
     cat("  No zeros found, skipping multiplicative replacement\n")
